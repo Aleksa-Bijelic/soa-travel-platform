@@ -439,9 +439,9 @@ export default function TourDetailPage() {
               style={{ height: '100%', width: '100%' }}
               scrollWheelZoom>
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                subdomains="abcd"
-                attribution="© OpenStreetMap · © CARTO"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                subdomains="abc"
+                attribution="© OpenStreetMap contributors"
                 maxZoom={19}
               />
               <MapClickHandler onMapClick={handleMapClick} />

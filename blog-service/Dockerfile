@@ -8,5 +8,6 @@ RUN mvn -B package -DskipTests
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /workspace/app/target/blog-service-0.0.1-SNAPSHOT.jar ./blog-service.jar
+RUN mkdir -p /app/uploads/blog-images && chmod -R 777 /app/uploads
 EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "blog-service.jar"]
