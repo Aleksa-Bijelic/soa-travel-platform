@@ -35,7 +35,7 @@ public class ReviewService(
             Rating = request.Rating,
             Comment = request.Comment,
             VisitedAt = request.VisitedAt,
-            ImageBase64s = request.ImageBase64s
+            ImageUrls = request.ImageUrls
         };
 
         var created = await reviewRepository.CreateAsync(review);
@@ -59,6 +59,6 @@ public class ReviewService(
         Comment = r.Comment,
         VisitedAt = r.VisitedAt,
         CreatedAt = r.CreatedAt,
-        ImageBase64s = r.ImageBase64s
+        ImageUrls = r.ImageUrls
     };
 }

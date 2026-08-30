@@ -2,15 +2,16 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
-	"saga"
-
-	"log"
 	"os"
 
+	"log"
+
+	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/joho/godotenv"
 
 	"net/http"
+
+	"saga"
 
 	nats "saga/nats"
 
@@ -54,8 +55,22 @@ func initDatabase() *gorm.DB {
 	return database
 }
 
-func ensureUploadDirs() {
-	os.MkdirAll(filepath.Join("uploads", "avatars"), os.ModePerm)
+func initCloudinary() *cloudinary.Cloudinary {
+	cloudName := os.Getenv("CLOUDINARY_CLOUD_NAME")
+	if cloudName == "" || cloudName == "your_cloud_name" {
+		log.Println("WARNING: Cloudinary not configured, image upload will be unavailable")
+		return nil
+	}
+	cld, err := cloudinary.NewFromParams(
+		cloudName,
+		os.Getenv("CLOUDINARY_API_KEY"),
+		os.Getenv("CLOUDINARY_API_SECRET"),
+	)
+	if err != nil {
+		log.Println("WARNING: Cloudinary init error:", err)
+		return nil
+	}
+	return cld
 }
 
 func initPublisher(subject string) saga.Publisher {
@@ -105,8 +120,6 @@ func startServer(userHandler *handler.UserHandler, profileHandler *handler.Profi
 	protected.Use(middleware.AuthMiddleware)
 	protected.HandleFunc("", profileHandler.UpdateProfile).Methods("PUT")
 
-	router.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("uploads"))))
-
 	router.PathPrefix("/").Handler(http.FileServer(http.Dir("./static")))
 	println("Server starting...")
 	log.Fatal(http.ListenAndServe(":8080", router))
@@ -118,7 +131,7 @@ func main() {
 		log.Fatal("Failed to connect to database")
 	}
 
-	ensureUploadDirs()
+	cld := initCloudinary()
 
 	followClient := grpcclient.NewFollowClient(os.Getenv("FOLLOWERS_GRPC_ADDR"))
 
@@ -128,13 +141,13 @@ func main() {
 
 	commandPublisher := initPublisher("block_user.command")
 	replySubscriber := initSubscriber("block_user.reply", "stakeholders")
-	orchestrator := initOrchestrator(commandPublisher, replySubscriber)
+	orch := initOrchestrator(commandPublisher, replySubscriber)
 
-	userService := &service.UserService{Repo: userRepo, Orchestrator: orchestrator}
+	userService := &service.UserService{Repo: userRepo, Orchestrator: orch}
 	profileService := &service.ProfileService{Repo: profileRepo, FollowClient: followClient, SnapshotRepo: snapshotRepo}
 
 	userHandler := &handler.UserHandler{Service: userService}
-	profileHandler := &handler.ProfileHandler{Service: profileService}
+	profileHandler := &handler.ProfileHandler{Service: profileService, Cloudinary: cld}
 
 	commandSubscriber := initSubscriber("block_user.command", "stakeholders")
 	replyPublisher := initPublisher("block_user.reply")

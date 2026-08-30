@@ -23,6 +23,9 @@ services:
       DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET}
       FOLLOWERS_GRPC_ADDR: followers-app:50051
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       NATS_HOST: ${NATS_HOST:-nats}
       NATS_PORT: ${NATS_PORT:-4222}
       NATS_USER: ${NATS_USER:-natscon}
@@ -77,13 +80,14 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       FOLLOWERS_GRPC_HOST: followers-app
       FOLLOWERS_GRPC_PORT: 50051
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     depends_on:
       blog-db:
         condition: service_healthy
       followers-app:
         condition: service_started
-    volumes:
-      - blog_uploads:/app/uploads
     logging: *fluent-bit
 
   tour-app:
@@ -105,6 +109,9 @@ services:
       STAKEHOLDERS_GRPC_ADDR: http://stakeholders-app:50051
       TOUR_SERVICE_GRPC_ADDR: tour-app:50051
       ASPNETCORE_URLS: http://+:8080
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       NATS_HOST: ${NATS_HOST:-nats}
       NATS_PORT: ${NATS_PORT:-4222}
       NATS_USER: ${NATS_USER:-natscon}
@@ -386,7 +393,6 @@ volumes:
   purchase_pg_data:
   followers_neo4j_data:
   grafana_data:
-  blog_uploads:
 
 networks:
   servers:

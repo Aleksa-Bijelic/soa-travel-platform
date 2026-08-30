@@ -49,7 +49,8 @@ public class TourDbContext(DbContextOptions<TourDbContext> options) : DbContext(
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Review>()
-            .Property(r => r.ImageBase64s)
+            .Property(r => r.ImageUrls)
+            .HasColumnName("ImageBase64s")
             .HasColumnType("text[]");
 
         modelBuilder.Entity<TourExecution>()

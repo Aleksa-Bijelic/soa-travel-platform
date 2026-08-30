@@ -12,7 +12,7 @@ public class CreateReviewRequest
 
     [Required]
     public DateTime VisitedAt { get; set; }
-    public List<string> ImageBase64s { get; set; } = [];
+    public List<string> ImageUrls { get; set; } = [];
 }
 
 public class ReviewResponse
@@ -26,5 +26,5 @@ public class ReviewResponse
     public string Comment { get; set; } = null!;
     public DateTime VisitedAt { get; set; }
     public DateTime CreatedAt { get; set; }
-    public List<string> ImageBase64s { get; set; } = [];
+    public List<string> ImageUrls { get; set; } = [];
 }

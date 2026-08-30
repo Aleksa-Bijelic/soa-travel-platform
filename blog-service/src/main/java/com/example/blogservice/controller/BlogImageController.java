@@ -1,10 +1,10 @@
 package com.example.blogservice.controller;
 
+import com.cloudinary.Cloudinary;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -12,21 +12,16 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/blogs")
 public class BlogImageController {
 
-    private static final Path UPLOAD_DIR = Paths.get("uploads", "blog-images");
+    private final Cloudinary cloudinary;
 
-    public BlogImageController() throws IOException {
-        Files.createDirectories(UPLOAD_DIR);
+    public BlogImageController(Cloudinary cloudinary) {
+        this.cloudinary = cloudinary;
     }
 
     @PostMapping(value = "/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -39,6 +34,11 @@ public class BlogImageController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
+        if (cloudinary == null) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("error", "Image upload service is not configured."));
+        }
+
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Image file is required."));
         }
@@ -48,16 +48,14 @@ public class BlogImageController {
             return ResponseEntity.badRequest().body(Map.of("error", "Uploaded file must be an image."));
         }
 
-        String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
-        String extension = StringUtils.getFilenameExtension(originalFilename);
-        String filename = UUID.randomUUID().toString();
-        if (extension != null && !extension.isBlank()) {
-            filename += "." + extension;
-        }
+        var result = cloudinary.uploader().upload(
+                file.getBytes(),
+                Map.of(
+                        "folder", "blog-service",
+                        "resource_type", "image"
+                ));
 
-        Path targetFile = UPLOAD_DIR.resolve(filename).normalize();
-        Files.copy(file.getInputStream(), targetFile, StandardCopyOption.REPLACE_EXISTING);
-
-        return ResponseEntity.ok(Map.of("url", "/blog/blogs/images/" + filename));
+        String url = (String) result.get("secure_url");
+        return ResponseEntity.ok(Map.of("url", url));
     }
 }

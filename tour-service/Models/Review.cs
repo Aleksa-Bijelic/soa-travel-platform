@@ -10,7 +10,7 @@ public class Review
     public string Comment { get; set; } = null!;
     public DateTime VisitedAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public List<string> ImageBase64s { get; set; } = [];
+    public List<string> ImageUrls { get; set; } = [];
     public string TouristUsername { get; set; } = null!;
     public string TouristEmail { get; set; } = null!;
 }

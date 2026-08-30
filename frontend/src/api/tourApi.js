@@ -23,6 +23,29 @@ async function req(method, path, body, token) {
   }
 }
 
+async function reqForm(method, path, formData, token) {
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${BASE}${path}`, {
+    method,
+    headers,
+    body: formData,
+    cache: 'no-store',
+  });
+  if (!res.ok && res.status !== 304) {
+    const text = await res.text().catch(() => `HTTP ${res.status}`);
+    throw new Error(text || `HTTP ${res.status}`);
+  }
+  if (res.status === 204 || res.status === 304) return null;
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    throw new Error(`Invalid JSON response: ${text}`);
+  }
+}
+
 export const api = {
   createTour: (data, token) =>
     req('POST', '/tours/tours', data, token),
@@ -110,4 +133,10 @@ export const api = {
 
   getExecutionById: (tourId, executionId, token) =>
     req('GET', `/tours/tours/${tourId}/executions/${executionId}`, undefined, token),
+
+  uploadTourImage: (file, token) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return reqForm('POST', '/tours/tours/images', formData, token);
+  },
 };

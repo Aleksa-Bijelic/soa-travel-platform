@@ -110,79 +110,79 @@ INSERT INTO public."KeyPoints" ("Id", "TourId", "Name", "Description", "Latitude
 
   -- Tour 01 – Novi Sad Old Town Walk (3 points)
   ('d1000000-0001-4000-8000-000000000001', 'c1000000-0001-4000-8000-000000000001',
-   'Trg Slobode (Freedom Square)', 'The central square of Novi Sad dominated by the neo-Gothic Name of Mary Church and the City Hall.', 45.2551, 19.8451, 'https://i.imgur.com/Y3m1zq6.jpeg', 1),
+   'Trg Slobode (Freedom Square)', 'The central square of Novi Sad dominated by the neo-Gothic Name of Mary Church and the City Hall.', 45.2551, 19.8451, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/Y3m1zq6_fb42np.jpg', 1),
   ('d1000000-0002-4000-8000-000000000002', 'c1000000-0001-4000-8000-000000000001',
-   'Zmaj Jovina Street', 'The main pedestrian boulevard lined with Baroque and Secession-era buildings, boutiques, and cafes.', 45.2555, 19.8428, 'https://i.imgur.com/t9YQ91y.jpeg', 2),
+   'Zmaj Jovina Street', 'The main pedestrian boulevard lined with Baroque and Secession-era buildings, boutiques, and cafes.', 45.2555, 19.8428, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/t9YQ91y_gkkbjy.jpg', 2),
   ('d1000000-0003-4000-8000-000000000003', 'c1000000-0001-4000-8000-000000000001',
-   'Dunavska Street & Danube Park', 'A peaceful riverside promenade with a historic park, the Bishop''s Palace, and views of Petrovaradin across the river.', 45.2589, 19.8458, 'https://i.imgur.com/89Ngzw1.jpeg', 3),
+   'Dunavska Street & Danube Park', 'A peaceful riverside promenade with a historic park, the Bishop''s Palace, and views of Petrovaradin across the river.', 45.2589, 19.8458, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106148/89Ngzw1_svcfzk.jpg', 3),
 
   -- Tour 02 – Petrovaradin Fortress (4 points)
   ('d1000000-0004-4000-8000-000000000004', 'c1000000-0002-4000-8000-000000000002',
-   'Upper Fortress Gate', 'The main entrance to the upper fortress, flanked by 18th-century ramparts built by Austrian engineers.', 45.2519, 19.8614, 'https://i.imgur.com/30FxZWc.jpeg', 1),
+   'Upper Fortress Gate', 'The main entrance to the upper fortress, flanked by 18th-century ramparts built by Austrian engineers.', 45.2519, 19.8614, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106147/30FxZWc_orfuq6.jpg', 1),
   ('d1000000-0005-4000-8000-000000000005', 'c1000000-0002-4000-8000-000000000002',
-   'Clock Tower', 'The iconic tower with famously reversed clock hands — the large hand shows hours, the small one minutes — so sailors on the Danube could read it easily.', 45.2512, 19.8626, 'https://i.imgur.com/X45E00s.jpeg', 2),
+   'Clock Tower', 'The iconic tower with famously reversed clock hands — the large hand shows hours, the small one minutes — so sailors on the Danube could read it easily.', 45.2512, 19.8626, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106148/X45E00s_ietfl8.jpg', 2),
   ('d1000000-0006-4000-8000-000000000006', 'c1000000-0002-4000-8000-000000000002',
-   'Underground Tunnels Entrance', 'Sixteen kilometres of underground corridors used as barracks, storage, and escape routes. Temperature stays at 11 °C year-round.', 45.2515, 19.8620, 'https://i.imgur.com/XqUNpSk.jpeg', 3),
+   'Underground Tunnels Entrance', 'Sixteen kilometres of underground corridors used as barracks, storage, and escape routes. Temperature stays at 11 °C year-round.', 45.2515, 19.8620, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/XqUNpSk_h6ei0s.jpg', 3),
   ('d1000000-0007-4000-8000-000000000007', 'c1000000-0002-4000-8000-000000000002',
-   'Danube Panorama Viewpoint', 'The highest rampart terrace offering a sweeping panorama of the Danube, Novi Sad skyline, and Fruška Gora hills beyond.', 45.2508, 19.8638, 'https://i.imgur.com/XIWNDIx.jpeg', 4),
+   'Danube Panorama Viewpoint', 'The highest rampart terrace offering a sweeping panorama of the Danube, Novi Sad skyline, and Fruška Gora hills beyond.', 45.2508, 19.8638, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/XIWNDIx_d2gqrq.jpg', 4),
 
   -- Tour 04 – Tara Canyon Hike (3 points)
   ('d1000000-0008-4000-8000-000000000008', 'c1000000-0004-4000-8000-000000000004',
-   'Banjska Stena Viewpoint', 'A dramatic rock outcrop 1,100 m above sea level overlooking the deepest part of the Tara River Canyon.', 43.8521, 19.5123, 'https://i.imgur.com/R1hAkuU.jpeg', 1),
+   'Banjska Stena Viewpoint', 'A dramatic rock outcrop 1,100 m above sea level overlooking the deepest part of the Tara River Canyon.', 43.8521, 19.5123, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/R1hAkuU_u9muxv.jpg', 1),
   ('d1000000-0009-4000-8000-000000000009', 'c1000000-0004-4000-8000-000000000004',
-   'Crno Jezero (Black Lake)', 'A glacial lake surrounded by black pine forest — the symbol of Tara National Park and a perfect rest stop.', 43.9012, 19.5847, 'https://i.imgur.com/zLyhAO6.jpeg', 2),
+   'Crno Jezero (Black Lake)', 'A glacial lake surrounded by black pine forest — the symbol of Tara National Park and a perfect rest stop.', 43.9012, 19.5847, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/zLyhAO6_kjgmk6.jpg', 2),
   ('d1000000-0010-4000-8000-000000000010', 'c1000000-0004-4000-8000-000000000004',
-   'Zaovine Lake Overlook', 'An artificial reservoir with brilliant turquoise water cutting through the forested mountain ridges — best photographed from the ridge trail.', 43.8765, 19.4989, 'https://i.imgur.com/Htf2dQu.jpeg', 3),
+   'Zaovine Lake Overlook', 'An artificial reservoir with brilliant turquoise water cutting through the forested mountain ridges — best photographed from the ridge trail.', 43.8765, 19.4989, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106147/Htf2dQu_xsstj9.jpg', 3),
 
   -- Tour 05 – Kopaonik Summit Trail (3 points)
   ('d1000000-0011-4000-8000-000000000011', 'c1000000-0005-4000-8000-000000000005',
-   'Gondola Top Station (Karaman Ridge)', 'The start of the alpine section at ~1,700 m. On clear days you can see as far as the Šar Mountains in North Macedonia.', 43.2891, 20.8102, 'https://i.imgur.com/ZJv6xAN.jpeg', 1),
+   'Gondola Top Station (Karaman Ridge)', 'The start of the alpine section at ~1,700 m. On clear days you can see as far as the Šar Mountains in North Macedonia.', 43.2891, 20.8102, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/ZJv6xAN_wl1zty.jpg', 1),
   ('d1000000-0012-4000-8000-000000000012', 'c1000000-0005-4000-8000-000000000005',
-   'Pančićev Vrh Summit (2,017 m)', 'The highest peak of Kopaonik, marked by a monument to botanist Josif Pančić who described the Pančić spruce. 360-degree views.', 43.2654, 20.8012, 'https://i.imgur.com/tY6RukD.jpeg', 2),
+   'Pančićev Vrh Summit (2,017 m)', 'The highest peak of Kopaonik, marked by a monument to botanist Josif Pančić who described the Pančić spruce. 360-degree views.', 43.2654, 20.8012, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/tY6RukD_hkcszh.jpg', 2),
   ('d1000000-0013-4000-8000-000000000013', 'c1000000-0005-4000-8000-000000000005',
-   'Samokovska Reka Spring', 'A crystal-clear mountain spring on the descent, surrounded by endemic Pančić spruce — the ideal lunch spot.', 43.2712, 20.8234, 'https://i.imgur.com/czaPcZZ.jpeg', 3),
+   'Samokovska Reka Spring', 'A crystal-clear mountain spring on the descent, surrounded by endemic Pančić spruce — the ideal lunch spot.', 43.2712, 20.8234, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106147/czaPcZZ_p0r7vq.jpg', 3),
 
   -- Tour 06 – Đavolja Varoš (2 points)
   ('d1000000-0014-4000-8000-000000000014', 'c1000000-0006-4000-8000-000000000006',
-   'Lower Formation — "The Wedding"', 'The largest cluster of stone figures, locally said to be the petrified guests of a cursed wedding. Over 150 pillars up to 15 m tall.', 43.0298, 21.3741, 'https://i.imgur.com/sN9tz0R.jpeg', 1),
+   'Lower Formation — "The Wedding"', 'The largest cluster of stone figures, locally said to be the petrified guests of a cursed wedding. Over 150 pillars up to 15 m tall.', 43.0298, 21.3741, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/sN9tz0R_shh1bg.jpg', 1),
   ('d1000000-0015-4000-8000-000000000015', 'c1000000-0006-4000-8000-000000000006',
-   'Red & White Spring', 'Two natural springs whose highly acidic, mineral-rich waters are responsible for carving the stone figures over millennia.', 43.034, 21.362, 'https://i.imgur.com/OVohIId.jpeg', 2),
+   'Red & White Spring', 'Two natural springs whose highly acidic, mineral-rich waters are responsible for carving the stone figures over millennia.', 43.034, 21.362, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106148/OVohIId_pflczx.jpg', 2),
 
   -- Tour 07 – Fruška Gora Wine & Monastery (3 points)
   ('d1000000-0017-4000-8000-000000000017', 'c1000000-0007-4000-8000-000000000007',
-   'Novo Hopovo Monastery', 'A peaceful hilltop monastery surrounded by fruit orchards, famous for its plum brandy and Morava-school fresco paintings.', 45.1421, 19.9965, 'https://i.imgur.com/zJAaLil.jpeg', 1),
+   'Novo Hopovo Monastery', 'A peaceful hilltop monastery surrounded by fruit orchards, famous for its plum brandy and Morava-school fresco paintings.', 45.1421, 19.9965, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/zJAaLil_ttgc0g.jpg', 1),
   ('d1000000-0016-4000-8000-000000000016', 'c1000000-0007-4000-8000-000000000007',
-   'Krušedol Monastery', 'A 16th-century Serbian Orthodox monastery, burial place of the Branković and Obrenović dynasties, with remarkable frescoes.', 45.1558, 19.9382, 'https://i.imgur.com/TdoxsEP.jpeg', 2),
+   'Krušedol Monastery', 'A 16th-century Serbian Orthodox monastery, burial place of the Branković and Obrenović dynasties, with remarkable frescoes.', 45.1558, 19.9382, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/TdoxsEP_wdsrv6.jpg', 2),
   ('d1000000-0018-4000-8000-000000000018', 'c1000000-0007-4000-8000-000000000007',
-   'Ivanović Family Winery', 'A boutique winery producing Neoplanta, Riesling, and Chardonnay. The tour ends with a cellar tasting of five wines paired with local cheese.', 45.1789, 19.9121, 'https://i.imgur.com/ZdxZjQR.jpeg', 3),
+   'Ivanović Family Winery', 'A boutique winery producing Neoplanta, Riesling, and Chardonnay. The tour ends with a cellar tasting of five wines paired with local cheese.', 45.1789, 19.9121, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/ZdxZjQR_mxgkll.jpg', 3),
 
   -- Tour 08 – Belgrade Food Market Crawl (3 points)
   ('d1000000-0019-4000-8000-000000000019', 'c1000000-0008-4000-8000-000000000008',
-   'Zeleni Venac Market', 'Belgrade''s oldest covered market — a maze of stalls piled with seasonal vegetables, homemade jams, dried herbs, and mountain cheese.', 44.8168, 20.4545, 'https://i.imgur.com/T2QUDOP.jpeg', 1),
+   'Zeleni Venac Market', 'Belgrade''s oldest covered market — a maze of stalls piled with seasonal vegetables, homemade jams, dried herbs, and mountain cheese.', 44.8168, 20.4545, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/T2QUDOP_pkq5vy.jpg', 1),
   ('d1000000-0020-4000-8000-000000000020', 'c1000000-0008-4000-8000-000000000008',
-   'Skadarlija Cobblestone Quarter', 'The Bohemian quarter of Belgrade, lined with traditional kafanas serving cevapi, pljeskavica, and live Serbian folk music.', 44.8172, 20.4632, 'https://i.imgur.com/QlREYed.jpeg', 2),
+   'Skadarlija Cobblestone Quarter', 'The Bohemian quarter of Belgrade, lined with traditional kafanas serving cevapi, pljeskavica, and live Serbian folk music.', 44.8172, 20.4632, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106147/QlREYed_w0vnao.jpg', 2),
   ('d1000000-0021-4000-8000-000000000021', 'c1000000-0008-4000-8000-000000000008',
-   'Rakija Bar Tasting Stop', 'A curated stop at a rakija specialist bar to sample 5 varieties — from quince to walnut — with snacks of ajvar and pogača bread.', 44.8165, 20.4608, 'https://i.imgur.com/29Skh3w.jpeg', 3),
+   'Rakija Bar Tasting Stop', 'A curated stop at a rakija specialist bar to sample 5 varieties — from quince to walnut — with snacks of ajvar and pogača bread.', 44.8165, 20.4608, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106148/29Skh3w_kpcbmx.jpg', 3),
 
   -- Tour 10 – Zemun Waterfront (3 points)
   ('d1000000-0022-4000-8000-000000000022', 'c1000000-0010-4000-8000-000000000010',
-   'Zemun Quay (Kej)', 'The lively riverside promenade of Zemun, dotted with fish restaurants and floating cafes, with views across the Danube to New Belgrade.', 44.8449, 20.4098, 'https://i.imgur.com/RIsd6G2.jpeg', 1),
+   'Zemun Quay (Kej)', 'The lively riverside promenade of Zemun, dotted with fish restaurants and floating cafes, with views across the Danube to New Belgrade.', 44.8449, 20.4098, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106146/RIsd6G2_enqbiq.jpg', 1),
   ('d1000000-0023-4000-8000-000000000023', 'c1000000-0010-4000-8000-000000000010',
-   'Gardoš Hill Stairways', 'A steep climb through narrow lanes of old Zemun, past colourful houses dating back to the 18th-century Habsburg period.', 44.8461, 20.4132, 'https://i.imgur.com/CfTczEh.jpeg', 2),
+   'Gardoš Hill Stairways', 'A steep climb through narrow lanes of old Zemun, past colourful houses dating back to the 18th-century Habsburg period.', 44.8461, 20.4132, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106147/CfTczEh_gtzcoc.jpg', 2),
   ('d1000000-0024-4000-8000-000000000024', 'c1000000-0010-4000-8000-000000000010',
-   'Millennium Tower (Kula Sibinjanin Janka)', 'A neo-Romanesque tower built in 1896 to mark 1,000 years of Hungarian statehood. Offers the best panoramic views of the Danube confluence.', 44.8467, 20.4141, 'https://i.imgur.com/VOFcJBv.jpeg', 3),
+   'Millennium Tower (Kula Sibinjanin Janka)', 'A neo-Romanesque tower built in 1896 to mark 1,000 years of Hungarian statehood. Offers the best panoramic views of the Danube confluence.', 44.8467, 20.4141, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/VOFcJBv_lfzp6u.jpg', 3),
 
   -- Tour 11 – Danube Sunset Cruise (3 points)
   ('d1000000-0025-4000-8000-000000000025', 'c1000000-0011-4000-8000-000000000011',
-   'Zemun Boat Dock', 'Departure point on the Zemun quay. Traditional drveni čamac (wooden boat) or covered river vessel depending on season.', 44.8443, 20.4089, 'https://i.imgur.com/wgbUJd1.jpeg', 1),
+   'Zemun Boat Dock', 'Departure point on the Zemun quay. Traditional drveni čamac (wooden boat) or covered river vessel depending on season.', 44.8443, 20.4089, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/wgbUJd1_vn9ijj.jpg', 1),
   ('d1000000-0026-4000-8000-000000000026', 'c1000000-0011-4000-8000-000000000011',
-   'Ada Ciganlija Pass', 'Cruise past the 4 km artificial river island — Belgrade''s beloved "Sea" — popular for swimming and sports in summer.', 44.7876, 20.4345, 'https://i.imgur.com/JtQzCVH.jpeg', 2),
+   'Ada Ciganlija Pass', 'Cruise past the 4 km artificial river island — Belgrade''s beloved "Sea" — popular for swimming and sports in summer.', 44.7876, 20.4345, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106147/JtQzCVH_j6uivs.jpg', 2),
   ('d1000000-0027-4000-8000-000000000027', 'c1000000-0011-4000-8000-000000000011',
-   'Kalemegdan Fortress from the Water', 'The most dramatic view of the Kalemegdan fortification walls rising above the Sava–Danube confluence, best seen at golden hour.', 44.8234, 20.4501, 'https://i.imgur.com/2OqHHr5.jpeg', 3),
+   'Kalemegdan Fortress from the Water', 'The most dramatic view of the Kalemegdan fortification walls rising above the Sava–Danube confluence, best seen at golden hour.', 44.8234, 20.4501, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106148/2OqHHr5_v2ymm3.jpg', 3),
 
   -- Tour 12 – Great War Island (2 points)
   ('d1000000-0028-4000-8000-000000000028', 'c1000000-0012-4000-8000-000000000012',
-   'Zodiac Landing Beach', 'The only permitted landing spot on the protected island — a sandy shore surrounded by willow thickets.', 44.8578, 20.4234, 'https://i.imgur.com/TSpBXeX.jpeg', 1),
+   'Zodiac Landing Beach', 'The only permitted landing spot on the protected island — a sandy shore surrounded by willow thickets.', 44.8578, 20.4234, 'https://res.cloudinary.com/dd3x7sscj/image/upload/v1788106145/TSpBXeX_rokybb.jpg', 1),
   ('d1000000-0029-4000-8000-000000000029', 'c1000000-0012-4000-8000-000000000012',
    'Heron & Cormorant Colony', 'A seasonal nesting area of grey herons and great cormorants visible from a safe observation distance at the island`s northern tip.', 44.8601, 20.4198, NULL, 2);
 
