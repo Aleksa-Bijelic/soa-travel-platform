@@ -217,6 +217,11 @@ services:
       DB_NAME: ${RESERVATION_DB_NAME:-reservation}
       DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET}
+      TOUR_SERVICE_GRPC_ADDR: tour-app:50051
+      NATS_HOST: ${NATS_HOST:-nats}
+      NATS_PORT: ${NATS_PORT:-4222}
+      NATS_USER: ${NATS_USER:-natscon}
+      NATS_PASSWORD: ${NATS_PASSWORD:-admin}
     depends_on:
       reservation-db:
         condition: service_healthy

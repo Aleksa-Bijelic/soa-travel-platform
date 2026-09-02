@@ -12,6 +12,10 @@ type ReservationRepository struct {
 	DB *gorm.DB
 }
 
+func (r *ReservationRepository) CreateWithTx(tx *gorm.DB, reservation *model.Reservation) error {
+	return tx.Create(reservation).Error
+}
+
 func (r *ReservationRepository) Create(reservation *model.Reservation) error {
 	return r.DB.Create(reservation).Error
 }

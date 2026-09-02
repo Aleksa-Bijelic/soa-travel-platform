@@ -11,14 +11,16 @@ import (
 	"example.com/reservation-service/dto"
 	"example.com/reservation-service/model"
 	"example.com/reservation-service/repo"
+	grpcclient "example.com/reservation-service/grpc"
 )
 
 type ReservationService struct {
-	EventRepo      *repo.EventRepository
+	EventRepo       *repo.EventRepository
 	ReservationRepo *repo.ReservationRepository
 	TourSessionRepo *repo.TourSessionRepository
-	ActivityRepo   *repo.ActivityRepository
-	DB             *gorm.DB
+	ActivityRepo    *repo.ActivityRepository
+	TourClient      *grpcclient.TourClient
+	DB              *gorm.DB
 }
 
 func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID string) (*model.Event, error) {
@@ -55,6 +57,14 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 	case model.EventTourSession:
 		if req.TourID == "" {
 			return nil, errors.New("tour_id is required for tour_session")
+		}
+		// Validate tour exists and is published via gRPC
+		published, err := s.TourClient.IsTourPublished(req.TourID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify tour: %w", err)
+		}
+		if !published {
+			return nil, errors.New("tour is not published")
 		}
 		if err := s.EventRepo.Create(event); err != nil {
 			return nil, err
@@ -166,14 +176,14 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 			Status:     model.ReservationPending,
 			ReservedAt: time.Now(),
 		}
-		if err := s.ReservationRepo.Create(reservation); err != nil {
+		if err := s.ReservationRepo.CreateWithTx(tx, reservation); err != nil {
 			return fmt.Errorf("failed to create reservation: %w", err)
 		}
 
 		// Step 7: Update event status if full
 		newCount := count + 1
 		if newCount >= int64(event.MaxCapacity) {
-			if err := s.EventRepo.UpdateStatus(eventID, model.EventFull); err != nil {
+			if err := s.EventRepo.UpdateStatusWithTx(tx, eventID, model.EventFull); err != nil {
 				return fmt.Errorf("failed to update event status: %w", err)
 			}
 		}

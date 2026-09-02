@@ -3,18 +3,22 @@ package handler
 import (
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 
 	"example.com/reservation-service/dto"
 	"example.com/reservation-service/middleware"
 	"example.com/reservation-service/service"
+	saga "saga"
+	reserveseat "saga/reserve_seat"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
 type ReservationHandler struct {
-	Service *service.ReservationService
+	Service   *service.ReservationService
+	Publisher saga.Publisher
 }
 
 func (h *ReservationHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
@@ -120,6 +124,7 @@ func (h *ReservationHandler) GetEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *ReservationHandler) ReserveSeat(w http.ResponseWriter, r *http.Request) {
+	log.Println("[RESERVE] Handler entered")
 	userID, err := getUserID(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
@@ -132,21 +137,42 @@ func (h *ReservationHandler) ReserveSeat(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid event id", http.StatusBadRequest)
 		return
 	}
+	log.Printf("[RESERVE] user=%s event=%s", userID, eventID)
 
 	var req dto.ReserveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	log.Printf("[RESERVE] calling service with seat=%v", req.SeatNumber)
 
 	reservation, err := h.Service.ReserveSeat(eventID, userID, req)
 	if err != nil {
+		log.Printf("[RESERVE] error: %v", err)
 		status := http.StatusBadRequest
 		if errors.Is(err, errors.New("event is full")) {
 			status = http.StatusConflict
 		}
 		http.Error(w, err.Error(), status)
 		return
+	}
+	log.Printf("[RESERVE] success: %s", reservation.ID)
+
+	// Publish payment command via NATS saga
+	if h.Publisher != nil {
+		event, err := h.Service.GetEventByID(eventID)
+		if err == nil {
+			cmd := reserveseat.ReservationCommand{
+				ReservationID: reservation.ID.String(),
+				EventID:       eventID.String(),
+				UserID:        userID,
+				Amount:        event.PricePerPerson,
+				Type:          reserveseat.ProcessPayment,
+			}
+			if err := h.Publisher.Publish(cmd); err != nil {
+				log.Printf("Failed to publish payment command for reservation %s: %v", reservation.ID, err)
+			}
+		}
 	}
 
 	writeJSON(w, reservation)

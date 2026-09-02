@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"example.com/reservation-service/model"
 )
 
@@ -40,6 +41,10 @@ func (r *EventRepository) UpdateStatus(id uuid.UUID, status model.EventStatus) e
 	return r.DB.Model(&model.Event{}).Where("id = ?", id).Update("status", status).Error
 }
 
+func (r *EventRepository) UpdateStatusWithTx(tx *gorm.DB, id uuid.UUID, status model.EventStatus) error {
+	return tx.Model(&model.Event{}).Where("id = ?", id).Update("status", status).Error
+}
+
 func (r *EventRepository) CountReservations(eventID uuid.UUID) (int64, error) {
 	var count int64
 	err := r.DB.Model(&model.Reservation{}).
@@ -53,9 +58,7 @@ func (r *EventRepository) CountReservations(eventID uuid.UUID) (int64, error) {
 // can modify the capacity check between our read and write.
 func (r *EventRepository) LockAndCountReservations(tx *gorm.DB, eventID uuid.UUID) (*model.Event, int64, error) {
 	var event model.Event
-	err := tx.Raw(
-		"SELECT * FROM events WHERE id = ? FOR UPDATE", eventID,
-	).Scan(&event).Error
+	err := tx.Where("id = ?", eventID).Clauses(clause.Locking{Strength: "UPDATE"}).First(&event).Error
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to lock event: %w", err)
 	}
