@@ -57,6 +57,7 @@ builder.Services.AddGrpcClient<TourService.Grpc.UserService.UserServiceClient>(o
     o.Address = new Uri(Environment.GetEnvironmentVariable("STAKEHOLDERS_GRPC_ADDR") ?? "http://stakeholders-app:50051");
 });
 builder.Services.AddSingleton<IStakeholdersClient, StakeholdersGrpcClient>();
+builder.Services.AddSingleton<ICloudinaryService, CloudinaryService>();
 builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
 builder.Services.AddScoped<IReviewService, ReviewService>();
 builder.Services.AddScoped<ITourExecutionRepository, TourExecutionRepository>();
@@ -108,7 +109,7 @@ using (var scope = app.Services.CreateScope())
             ""Comment"" text NOT NULL,
             ""VisitedAt"" timestamp with time zone NOT NULL,
             ""CreatedAt"" timestamp with time zone NOT NULL,
-            ""ImageBase64s"" text[] NOT NULL,
+            ""ImageUrls"" text[] NOT NULL,
             CONSTRAINT ""PK_Reviews"" PRIMARY KEY (""Id""),
             CONSTRAINT ""FK_Reviews_Tours_TourId"" FOREIGN KEY (""TourId"") REFERENCES ""Tours"" (""Id"") ON DELETE CASCADE
         );

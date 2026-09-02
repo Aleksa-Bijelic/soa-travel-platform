@@ -113,10 +113,10 @@ function ReviewCard({ review }) {
 
       <p style={{ marginTop: 12, fontSize: 14, lineHeight: 1.6, color: 'var(--ink-soft)' }}>{review.comment}</p>
 
-      {review.imageBase64s?.length > 0 && (
+      {review.imageUrls?.length > 0 && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-          {review.imageBase64s.map((img, i) => (
-            <img key={i} src={`data:image/jpeg;base64,${img}`} alt={`Review image ${i + 1}`}
+          {review.imageUrls.map((img, i) => (
+            <img key={i} src={img} alt={`Review image ${i + 1}`}
               style={{ width: 90, height: 90, objectFit: 'cover', borderRadius: 8, border: '0.5px solid var(--sage-line)' }} />
           ))}
         </div>
@@ -142,21 +142,14 @@ function ReviewSection({ tourId, token, isPurchased }) {
 
   const createMut = useMutation({
     mutationFn: async () => {
-      const imageBase64s = await Promise.all(
-        form.images.map((file) =>
-          new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          })
-        )
+      const imageUrls = await Promise.all(
+        form.images.map((file) => api.uploadTourImage(file, token))
       );
       return api.createReview(tourId, {
         rating: form.rating,
         comment: form.comment,
         visitedAt: new Date(form.visitedAt).toISOString(),
-        imageBase64s,
+        imageUrls: imageUrls.map(r => r.url).filter(Boolean),
       }, token);
     },
     onSuccess: () => {
@@ -419,9 +412,9 @@ export default function PublicTourDetailPage() {
           <div style={{ height: 460, borderRadius: 12, overflow: 'hidden', border: '0.5px solid #c8d5c0' }}>
             <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                subdomains="abcd"
-                attribution="© OpenStreetMap · © CARTO"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                subdomains="abc"
+                attribution="© OpenStreetMap contributors"
                 maxZoom={19}
               />
               {mapPoints.map((kp, i) => (

@@ -1,15 +1,17 @@
 package handler
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/cloudinary/cloudinary-go/v2"
+	"github.com/cloudinary/cloudinary-go/v2/api/uploader"
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 	"stakeholders-service.xws.com/dto"
@@ -18,7 +20,8 @@ import (
 )
 
 type ProfileHandler struct {
-	Service *service.ProfileService
+	Service   *service.ProfileService
+	Cloudinary *cloudinary.Cloudinary
 }
 
 func (handler *ProfileHandler) GetProfile(writer http.ResponseWriter, request *http.Request) {
@@ -114,23 +117,34 @@ func (handler *ProfileHandler) UpdateProfile(writer http.ResponseWriter, request
 	if err == nil {
 		defer file.Close()
 
-		ext := filepath.Ext(header.Filename)
-		filename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
-		savePath := filepath.Join("uploads", "avatars", filename)
+		if handler.Cloudinary == nil {
+			http.Error(writer, "Image upload service is not configured", http.StatusServiceUnavailable)
+			return
+		}
 
-		dst, err := os.Create(savePath)
+		buf := &bytes.Buffer{}
+		if _, err := io.Copy(buf, file); err != nil {
+			http.Error(writer, "Could not read avatar", http.StatusInternalServerError)
+			return
+		}
+
+		_ = header
+
+		result, err := handler.Cloudinary.Upload.Upload(
+			context.Background(),
+			buf,
+			uploader.UploadParams{
+				Folder:    "stakeholders",
+				PublicID:  fmt.Sprintf("avatar-%s", userID.String()),
+				Overwrite: boolPtr(true),
+			},
+		)
 		if err != nil {
-			http.Error(writer, "Could not save avatar", http.StatusInternalServerError)
-			return
-		}
-		defer dst.Close()
-
-		if _, err := io.Copy(dst, file); err != nil {
-			http.Error(writer, "Could not write avatar", http.StatusInternalServerError)
+			http.Error(writer, "Could not upload avatar: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		req.Avatar = "/uploads/avatars/" + filename
+		req.Avatar = result.SecureURL
 	}
 
 	if err := handler.Service.UpdateProfile(userID, req); err != nil {
@@ -146,3 +160,5 @@ func (handler *ProfileHandler) UpdateProfile(writer http.ResponseWriter, request
 	writer.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(writer).Encode(updatedProfile)
 }
+
+func boolPtr(b bool) *bool { return &b }

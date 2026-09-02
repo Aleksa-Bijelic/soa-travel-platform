@@ -96,9 +96,9 @@ export default function SimulatorPage() {
         <div style={{ height: 420, borderRadius: 12, overflow: 'hidden', border: '0.5px solid #c8d5c0' }}>
           <MapContainer center={mapCenter} zoom={mapZoom} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
             <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-              subdomains="abcd"
-              attribution="© OpenStreetMap · © CARTO"
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                subdomains="abc"
+              attribution="© OpenStreetMap contributors"
               maxZoom={19}
             />
             <MapClickHandler onClick={(latlng) => {

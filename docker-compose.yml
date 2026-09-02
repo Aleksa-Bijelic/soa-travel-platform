@@ -11,6 +11,7 @@ services:
       context: .
       dockerfile: ./stakeholders-service/Dockerfile
     container_name: stakeholders-app
+    restart: on-failure
     networks:
       - servers
     environment:
@@ -22,6 +23,9 @@ services:
       DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET}
       FOLLOWERS_GRPC_ADDR: followers-app:50051
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       NATS_HOST: ${NATS_HOST:-nats}
       NATS_PORT: ${NATS_PORT:-4222}
       NATS_USER: ${NATS_USER:-natscon}
@@ -32,7 +36,7 @@ services:
       stakeholders-db:
         condition: service_healthy
       nats:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - ./stakeholders-service/uploads:/app/stakeholders-service/uploads
     logging: *fluent-bit
@@ -51,7 +55,7 @@ services:
       - "5433:5432"
     volumes:
       - stakeholders_pg_data:/var/lib/postgresql/data
-      - ./init/postgres/stakeholders:/docker-entrypoint-initdb.d
+      - ./init/postgres/stakeholders:/docker-entrypoint-initdb.d:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${STAKEHOLDERS_DB_USER:-postgres}"]
       interval: 5s
@@ -64,6 +68,7 @@ services:
       context: .
       dockerfile: ./blog-service/Dockerfile
     container_name: blog-app
+    restart: on-failure
     networks:
       - servers
     environment:
@@ -75,13 +80,14 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       FOLLOWERS_GRPC_HOST: followers-app
       FOLLOWERS_GRPC_PORT: 50051
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
     depends_on:
       blog-db:
         condition: service_healthy
       followers-app:
         condition: service_started
-    volumes:
-      - ./blog-service/uploads:/app/uploads
     logging: *fluent-bit
 
   tour-app:
@@ -89,6 +95,7 @@ services:
       context: .
       dockerfile: tour-service/Dockerfile
     container_name: tour-app
+    restart: on-failure
     networks:
       - servers
     environment:
@@ -102,6 +109,9 @@ services:
       STAKEHOLDERS_GRPC_ADDR: http://stakeholders-app:50051
       TOUR_SERVICE_GRPC_ADDR: tour-app:50051
       ASPNETCORE_URLS: http://+:8080
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
       NATS_HOST: ${NATS_HOST:-nats}
       NATS_PORT: ${NATS_PORT:-4222}
       NATS_USER: ${NATS_USER:-natscon}
@@ -113,7 +123,7 @@ services:
       purchase-app:
         condition: service_started
       nats:
-        condition: service_started
+        condition: service_healthy
     logging: *fluent-bit
 
   tour-db:
@@ -130,7 +140,7 @@ services:
       - "5435:5432"
     volumes:
       - tour_pg_data:/var/lib/postgresql/data
-      - ./init/postgres/tours:/docker-entrypoint-initdb.d
+      - ./init/postgres/tours:/docker-entrypoint-initdb.d:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${TOUR_DB_USER:-postgres}"]
       interval: 5s
@@ -143,6 +153,7 @@ services:
       context: .
       dockerfile: ./purchase-service/Dockerfile
     container_name: purchase-app
+    restart: on-failure
     networks:
       - servers
     environment:
@@ -163,7 +174,7 @@ services:
       purchase-db:
         condition: service_healthy
       nats:
-        condition: service_started
+        condition: service_healthy
     ports:
       - "8086:8083"
     logging: *fluent-bit
@@ -182,7 +193,7 @@ services:
       - "5436:5432"
     volumes:
       - purchase_pg_data:/var/lib/postgresql/data
-      - ./init/postgres/purchases:/docker-entrypoint-initdb.d
+      - ./init/postgres/purchases:/docker-entrypoint-initdb.d:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PURCHASE_DB_USER:-postgres}"]
       interval: 5s
@@ -198,7 +209,7 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro,Z
     depends_on:
       - blog-app
       - stakeholders-app
@@ -219,7 +230,7 @@ services:
       - "27018:27017"
     volumes:
       - blog_mongo_data:/data/db
-      - ./init/mongodb/blog:/docker-entrypoint-initdb.d
+      - ./init/mongodb/blog:/docker-entrypoint-initdb.d:Z
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval \"db.adminCommand({ ping: 1 })\" || exit 1"]
       interval: 5s
@@ -232,6 +243,7 @@ services:
       context: .
       dockerfile: ./followers-service/Dockerfile
     container_name: followers-app
+    restart: on-failure
     networks:
       - servers
     environment:
@@ -248,7 +260,7 @@ services:
       followers-db:
         condition: service_healthy
       nats:
-        condition: service_started
+        condition: service_healthy
     logging: *fluent-bit
 
   followers-db:
@@ -264,7 +276,7 @@ services:
       - "7687:7687"
     volumes:
       - followers_neo4j_data:/data
-      - ./init/neo4j/followers:/docker-entrypoint-initdb.d
+      - ./init/neo4j/followers:/docker-entrypoint-initdb.d:Z
     entrypoint: >
       bash -c "
         /startup/docker-entrypoint.sh neo4j &
@@ -284,7 +296,7 @@ services:
     networks:
       - servers
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro,Z
     ports:
       - "9090:9090"
 
@@ -300,8 +312,8 @@ services:
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro,Z
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.47.0
@@ -332,12 +344,18 @@ services:
       - /:/host/root:ro
 
   nats:
-    image: nats
+    image: nats:alpine
     container_name: nats
     restart: on-failure
     networks:
       - servers
     command: ["-m", "8222", "--user", "${NATS_USER:-natscon}", "--pass", "${NATS_PASSWORD:-admin}"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -359,8 +377,9 @@ services:
   fluent-bit:
     image: grafana/fluent-bit-plugin-loki:latest
     container_name: fluent-bit
+    user: root
     volumes:
-      - ./monitoring/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+      - ./monitoring/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:Z
     ports:
       - "24224:24224"
       - "24224:24224/udp"

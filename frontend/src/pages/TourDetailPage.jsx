@@ -103,12 +103,14 @@ export default function TourDetailPage() {
   const [err, setErr] = useState(null);
   const [pendingPin, setPendingPin] = useState(null);
   const [kpForm, setKpForm] = useState({ name: '', description: '', imageUrl: '' });
+  const [kpFile, setKpFile] = useState(null);
   const [durForm, setDurForm] = useState({ transportType: 'Walking', durationInMinutes: 60 });
   const [draftForm, setDraftForm] = useState({ name: '', description: '', difficulty: 'Medium', tagsRaw: '', price: 0 });
   const [showDraftEditor, setShowDraftEditor] = useState(false);
 
   const [editingKp, setEditingKp] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', imageUrl: '' });
+  const [editFile, setEditFile] = useState(null);
   const [editPendingPin, setEditPendingPin] = useState(null);
   const [editReposition, setEditReposition] = useState(false);
 
@@ -209,16 +211,26 @@ export default function TourDetailPage() {
     publishMut.mutate();
   };
 
-  const addKeyPoint = () => {
+  const addKeyPoint = async () => {
     if (!pendingPin) return;
     if (!kpForm.name.trim()) { setErr('Give the key point a name.'); return; }
     setErr(null);
+    let imageUrl = kpForm.imageUrl.trim() || null;
+    if (kpFile) {
+      try {
+        const result = await api.uploadTourImage(kpFile, token);
+        imageUrl = result.url;
+      } catch (e) {
+        setErr('Image upload failed: ' + (e.message || 'Unknown error'));
+        return;
+      }
+    }
     kpMut.mutate({
       name: kpForm.name.trim(),
       description: kpForm.description.trim(),
       latitude: pendingPin.lat,
       longitude: pendingPin.lng,
-      imageUrl: kpForm.imageUrl.trim() || null,
+      imageUrl,
     });
   };
 
@@ -228,6 +240,7 @@ export default function TourDetailPage() {
     setPendingPin(null);
     setEditingKp(kp);
     setEditForm({ name: kp.name, description: kp.description || '', imageUrl: kp.imageUrl || '' });
+    setEditFile(null);
     setEditPendingPin(null);
     setEditReposition(false);
   };
@@ -238,9 +251,19 @@ export default function TourDetailPage() {
     setEditReposition(false);
   };
 
-  const saveEditKp = () => {
+  const saveEditKp = async () => {
     if (!editForm.name.trim()) { setErr('Name is required.'); return; }
     setErr(null);
+    let imageUrl = editForm.imageUrl.trim() || null;
+    if (editFile) {
+      try {
+        const result = await api.uploadTourImage(editFile, token);
+        imageUrl = result.url;
+      } catch (e) {
+        setErr('Image upload failed: ' + (e.message || 'Unknown error'));
+        return;
+      }
+    }
     const coords = editPendingPin
       ? { latitude: editPendingPin.lat, longitude: editPendingPin.lng }
       : { latitude: editingKp.latitude, longitude: editingKp.longitude };
@@ -249,7 +272,7 @@ export default function TourDetailPage() {
       data: {
         name: editForm.name.trim(),
         description: editForm.description.trim(),
-        imageUrl: editForm.imageUrl.trim() || null,
+        imageUrl,
         ...coords,
       },
     });
@@ -266,6 +289,7 @@ export default function TourDetailPage() {
     if (!editingKp) {
       setPendingPin({ lat: latlng.lat, lng: latlng.lng });
       setKpForm({ name: '', description: '', imageUrl: '' });
+      setKpFile(null);
     }
   };
 
@@ -439,9 +463,9 @@ export default function TourDetailPage() {
               style={{ height: '100%', width: '100%' }}
               scrollWheelZoom>
               <TileLayer
-                url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-                subdomains="abcd"
-                attribution="© OpenStreetMap · © CARTO"
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                subdomains="abc"
+                attribution="© OpenStreetMap contributors"
                 maxZoom={19}
               />
               <MapClickHandler onMapClick={handleMapClick} />
@@ -480,9 +504,8 @@ export default function TourDetailPage() {
                     value={kpForm.description} onChange={(e) => setKpForm({ ...kpForm, description: e.target.value })} />
                 </div>
                 <div className="field">
-                  <label className="field-label">Image URL (optional)</label>
-                  <input className="input" placeholder="https://…"
-                    value={kpForm.imageUrl} onChange={(e) => setKpForm({ ...kpForm, imageUrl: e.target.value })} />
+                  <label className="field-label">Image (optional)</label>
+                  <input type="file" accept="image/*" onChange={(e) => setKpFile(e.target.files?.[0] || null)} />
                 </div>
                 <div className="row gap-8" style={{ justifyContent: 'flex-end' }}>
                   <Btn variant="ghost" size="sm" onClick={() => setPendingPin(null)}>Cancel</Btn>
@@ -514,9 +537,8 @@ export default function TourDetailPage() {
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} />
                 </div>
                 <div className="field">
-                  <label className="field-label">Image URL (optional)</label>
-                  <input className="input" placeholder="https://…" value={editForm.imageUrl}
-                    onChange={(e) => setEditForm({ ...editForm, imageUrl: e.target.value })} />
+                  <label className="field-label">Image (optional)</label>
+                  <input type="file" accept="image/*" onChange={(e) => setEditFile(e.target.files?.[0] || null)} />
                 </div>
 
                 <div className="field">
