@@ -22,12 +22,16 @@ export default function CartPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchase-cart'] });
       qc.invalidateQueries({ queryKey: ['public-tour'] });
+      qc.invalidateQueries({ queryKey: ['my-reservations'] });
     },
   });
 
   const removeMut = useMutation({
     mutationFn: (itemId) => api.removeCartItem(itemId, token),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['purchase-cart'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchase-cart'] });
+      qc.invalidateQueries({ queryKey: ['my-reservations'] });
+    },
   });
 
   if (isLoading) return <div className="container" style={{ padding: 40 }}>Loading…</div>;

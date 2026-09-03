@@ -44,6 +44,30 @@ func initDatabase() *gorm.DB {
 	}
 
 	database.AutoMigrate(&model.Event{}, &model.TourSession{}, &model.Activity{}, &model.Reservation{})
+
+	// Drop old FULL unique constraints/indexes (they blocked re-booking after cancel,
+	// because a cancelled row still violated the unique index).
+	// Old deployments created them either as CONSTRAINTs or as INDEXes, so drop both forms.
+	database.Exec("ALTER TABLE reservations DROP CONSTRAINT IF EXISTS idx_event_seat")
+	database.Exec("ALTER TABLE reservations DROP CONSTRAINT IF EXISTS idx_event_tourist")
+	database.Exec("ALTER TABLE reservations DROP CONSTRAINT IF EXISTS ux_reservation_event_tourist_active")
+	database.Exec("ALTER TABLE reservations DROP CONSTRAINT IF EXISTS ux_reservation_event_seat_active")
+	database.Exec("DROP INDEX IF EXISTS idx_event_seat")
+	database.Exec("DROP INDEX IF EXISTS idx_event_tourist")
+	// One active reservation per tourist is NO LONGER enforced at DB level:
+	// activities allow multiple seats per tourist (one reservation per seat).
+	// Seat uniqueness is the final race-condition guard.
+	database.Exec("DROP INDEX IF EXISTS ux_reservation_event_tourist_active")
+	// Recreate plain (non-unique) lookup indexes dropped above — AutoMigrate may
+	// have skipped them if uniquely-indexed versions already existed.
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_event_seat ON reservations(event_id, seat_number)")
+	database.Exec("CREATE INDEX IF NOT EXISTS idx_event_tourist ON reservations(event_id, tourist_id)")
+	// Partial UNIQUE index: one active holder per seat. Concurrent transactions
+	// for the same seat serialize on the event lock; this index catches any
+	// leftover race with a 23505 mapped to "seat is already taken".
+	database.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_reservation_event_seat_active
+		ON reservations(event_id, seat_number) WHERE status IN ('pending','confirmed') AND seat_number IS NOT NULL`)
+
 	return database
 }
 
@@ -94,14 +118,14 @@ func main() {
 		DB:              database,
 	}
 
-	reservationHandler := &handler.ReservationHandler{Service: reservationService, Publisher: nil}
+	// Start background cleaner for expired reservations
+	reservationService.StartExpiryCleaner()
+
+	reservationHandler := &handler.ReservationHandler{Service: reservationService}
 
 	// NATS saga — reservation command handler (receives payment confirmations)
 	cmdSubscriber := initSubscriber("reservation.command", "reservations")
 	replyPublisher := initPublisher("reservation.reply")
-	if replyPublisher != nil {
-		reservationHandler.Publisher = replyPublisher
-	}
 	if cmdSubscriber != nil && replyPublisher != nil {
 		_, err := handler.NewReserveSeatCommandHandler(reservationService, replyPublisher, cmdSubscriber)
 		if err != nil {
@@ -118,6 +142,7 @@ func main() {
 	router.HandleFunc("/events/{id}/reserve", reservationHandler.ReserveSeat).Methods("POST")
 	router.HandleFunc("/events/{id}/seats", reservationHandler.GetSeats).Methods("GET")
 	router.HandleFunc("/reservations/my", reservationHandler.GetMyReservations).Methods("GET")
+	router.HandleFunc("/reservations/{id}", reservationHandler.GetReservation).Methods("GET")
 	router.HandleFunc("/reservations/{id}", reservationHandler.CancelReservation).Methods("DELETE")
 	router.HandleFunc("/reservations/{id}/confirm", reservationHandler.ConfirmReservation).Methods("PUT")
 

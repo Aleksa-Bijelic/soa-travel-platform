@@ -11,6 +11,7 @@ public class TourDbContext(DbContextOptions<TourDbContext> options) : DbContext(
     public DbSet<Review> Reviews => Set<Review>();
     public DbSet<TourExecution> TourExecutions => Set<TourExecution>();
     public DbSet<CompletedKeyPoint> CompletedKeyPoints => Set<CompletedKeyPoint>();
+    public DbSet<TourSession> TourSessions => Set<TourSession>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -67,6 +68,12 @@ public class TourDbContext(DbContextOptions<TourDbContext> options) : DbContext(
             .HasOne(c => c.TourExecution)
             .WithMany(e => e.CompletedKeyPoints)
             .HasForeignKey(c => c.TourExecutionId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<TourSession>()
+            .HasOne(s => s.Tour)
+            .WithMany()
+            .HasForeignKey(s => s.TourId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 }

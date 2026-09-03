@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,7 +34,7 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 		return nil, errors.New("event date must be in the future")
 	}
 
-	if req.MaxCapacity <= 0 {
+	if req.MaxCapacity <= 0 && model.EventType(req.EventType) != model.EventActivity {
 		return nil, errors.New("max_capacity must be positive")
 	}
 
@@ -47,6 +48,10 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 		Name:           req.Name,
 		Description:    req.Description,
 		Location:       req.Location,
+		City:           req.City,
+		Latitude:       req.Latitude,
+		Longitude:      req.Longitude,
+		ImageURL:       req.ImageURL,
 		EventDate:      eventDate,
 		MaxCapacity:    req.MaxCapacity,
 		PricePerPerson: req.PricePerPerson,
@@ -79,8 +84,17 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 		}
 
 	case model.EventActivity:
-		if req.ActivityType == "" {
-			return nil, errors.New("activity_type is required for activity")
+		if !model.IsSupportedCategory(model.ActivityType(req.ActivityType)) {
+			return nil, errors.New("activity_type must be one of: concert, theater, open_air_cinema")
+		}
+		if req.City == "" {
+			return nil, errors.New("city is required for activity")
+		}
+		if !model.IsAllowedCapacity(req.MaxCapacity) {
+			return nil, errors.New("max_capacity must be one of: 30, 80, 240, 400")
+		}
+		if req.Latitude == nil || req.Longitude == nil {
+			return nil, errors.New("location on the map is required for activity")
 		}
 		if err := s.EventRepo.Create(event); err != nil {
 			return nil, err
@@ -88,7 +102,6 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 		activity := &model.Activity{
 			EventID:      event.ID,
 			ActivityType: model.ActivityType(req.ActivityType),
-			VenueInfo:    req.VenueInfo,
 		}
 		if err := s.ActivityRepo.Create(activity); err != nil {
 			return nil, err
@@ -106,11 +119,13 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 //
 // Flow:
 // 1. BEGIN transaction
-// 2. LOCK event row (SELECT ... FOR UPDATE)
+// 2. LOCK event row (SELECT ... FOR UPDATE) — concurrent requests for the
+//    same event serialize here, so two tourists can never take the same seat.
 // 3. Check capacity
-// 4. Check seat availability (for activities)
-// 5. Check for duplicate reservation
-// 6. INSERT reservation
+// 4. Check seat availability inside the lock (for activities / seated events)
+// 5. For tour sessions: reject a second active reservation by the same tourist
+//    (activities allow multiple seats per tourist, one reservation per seat)
+// 6. INSERT reservation (seat-level partial unique index is the final guard)
 // 7. UPDATE event status if full
 // 8. COMMIT
 //
@@ -158,16 +173,21 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 			return errors.New("seat_number is required for activities")
 		}
 
-		// Step 5: Check for duplicate reservation
-		isNew, err := s.ReservationRepo.CheckDuplicateReservation(tx, eventID, touristID)
-		if err != nil {
-			return err
-		}
-		if !isNew {
-			return errors.New("you already have an active reservation for this event")
+		// Step 5: For tour sessions a tourist may hold only one active
+		// reservation. Activities allow several (one reservation per seat),
+		// seat uniqueness is enforced by the check above + DB index below.
+		if event.EventType == model.EventTourSession {
+			isNew, err := s.ReservationRepo.CheckDuplicateReservation(tx, eventID, touristID)
+			if err != nil {
+				return err
+			}
+			if !isNew {
+				return errors.New("you already have an active reservation for this event")
+			}
 		}
 
-		// Step 6: Create reservation
+		// Step 6: Create reservation with 5-minute expiry
+		expiresAt := time.Now().Add(5 * time.Minute)
 		reservation := &model.Reservation{
 			ID:         uuid.New(),
 			EventID:    eventID,
@@ -175,6 +195,7 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 			SeatNumber: req.SeatNumber,
 			Status:     model.ReservationPending,
 			ReservedAt: time.Now(),
+			ExpiresAt:  &expiresAt,
 		}
 		if err := s.ReservationRepo.CreateWithTx(tx, reservation); err != nil {
 			return fmt.Errorf("failed to create reservation: %w", err)
@@ -195,15 +216,30 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 	})
 
 	if err != nil {
+		if isSeatConflict(err) {
+			if req.SeatNumber != nil {
+				return nil, fmt.Errorf("seat %d is already taken", *req.SeatNumber)
+			}
+			return nil, errors.New("seat is already taken")
+		}
 		return nil, err
 	}
 	return result, nil
 }
 
+func isSeatConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "ux_reservation_event_seat_active") ||
+		(strings.Contains(msg, "duplicate key") && strings.Contains(msg, "seat"))
+}
+
 func (s *ReservationService) CancelReservation(reservationID uuid.UUID, touristID string) error {
 	return s.DB.Transaction(func(tx *gorm.DB) error {
-		reservation, err := s.ReservationRepo.FindByID(reservationID)
-		if err != nil {
+		var reservation model.Reservation
+		if err := tx.Where("id = ?", reservationID).First(&reservation).Error; err != nil {
 			return errors.New("reservation not found")
 		}
 		if reservation.TouristID != touristID {
@@ -213,14 +249,17 @@ func (s *ReservationService) CancelReservation(reservationID uuid.UUID, touristI
 			return errors.New("cannot cancel this reservation")
 		}
 
-		if err := s.ReservationRepo.UpdateStatus(reservationID, model.ReservationCancelled); err != nil {
+		if err := tx.Model(&model.Reservation{}).Where("id = ?", reservationID).Updates(map[string]interface{}{
+			"status":     model.ReservationCancelled,
+			"expires_at": nil,
+		}).Error; err != nil {
 			return err
 		}
 
 		// If event was full, set it back to scheduled
-		event, err := s.EventRepo.FindByID(reservation.EventID)
-		if err == nil && event.Status == model.EventFull {
-			_ = s.EventRepo.UpdateStatus(event.ID, model.EventScheduled)
+		var event model.Event
+		if err := tx.Where("id = ?", reservation.EventID).First(&event).Error; err == nil && event.Status == model.EventFull {
+			_ = tx.Model(&model.Event{}).Where("id = ?", event.ID).Update("status", model.EventScheduled).Error
 		}
 
 		log.Printf("[RESERVATION] Cancelled reservation %s by tourist %s", reservationID, touristID)
@@ -229,19 +268,87 @@ func (s *ReservationService) CancelReservation(reservationID uuid.UUID, touristI
 }
 
 func (s *ReservationService) ConfirmReservation(reservationID uuid.UUID) error {
-	return s.ReservationRepo.UpdateStatus(reservationID, model.ReservationConfirmed)
+	return s.DB.Transaction(func(tx *gorm.DB) error {
+		var reservation model.Reservation
+		if err := tx.Where("id = ?", reservationID).First(&reservation).Error; err != nil {
+			return errors.New("reservation not found")
+		}
+		if reservation.Status == model.ReservationConfirmed {
+			return nil // idempotent — already paid
+		}
+		if reservation.Status != model.ReservationPending {
+			return fmt.Errorf("cannot confirm reservation with status %s", reservation.Status)
+		}
+		if reservation.ExpiresAt != nil && reservation.ExpiresAt.Before(time.Now()) {
+			// Expired while sitting in cart — cancel it so the seat is freed.
+			_ = tx.Model(&model.Reservation{}).Where("id = ?", reservationID).Updates(map[string]interface{}{
+				"status":     model.ReservationCancelled,
+				"expires_at": nil,
+			}).Error
+			var event model.Event
+			if err := tx.Where("id = ?", reservation.EventID).First(&event).Error; err == nil && event.Status == model.EventFull {
+				_ = tx.Model(&model.Event{}).Where("id = ?", event.ID).Update("status", model.EventScheduled).Error
+			}
+			return errors.New("reservation expired, please make a new reservation")
+		}
+		if err := tx.Model(&model.Reservation{}).Where("id = ?", reservationID).Updates(map[string]interface{}{
+			"status":     model.ReservationConfirmed,
+			"expires_at": nil,
+		}).Error; err != nil {
+			return err
+		}
+		log.Printf("[RESERVATION] Confirmed reservation %s", reservationID)
+		return nil
+	})
 }
 
 func (s *ReservationService) GetEventByID(id uuid.UUID) (*model.Event, error) {
 	return s.EventRepo.FindByID(id)
 }
 
-func (s *ReservationService) GetEvents(eventType, status string) ([]model.Event, error) {
-	return s.EventRepo.FindAll(eventType, status)
+func (s *ReservationService) GetEvents(f repo.EventFilter) ([]model.Event, error) {
+	return s.EventRepo.FindAll(f)
+}
+
+// EnrichEvent loads tour-session / activity details for API responses.
+func (s *ReservationService) EnrichEvent(e model.Event, count int64) dto.EventResponse {
+	resp := dto.EventResponse{
+		ID:              e.ID.String(),
+		EventType:       string(e.EventType),
+		Name:            e.Name,
+		Description:     e.Description,
+		Location:        e.Location,
+		City:            e.City,
+		Latitude:        e.Latitude,
+		Longitude:       e.Longitude,
+		ImageURL:        e.ImageURL,
+		EventDate:       e.EventDate,
+		MaxCapacity:     e.MaxCapacity,
+		CurrentReserved: int(count),
+		AvailableSpots:  e.MaxCapacity - int(count),
+		PricePerPerson:  e.PricePerPerson,
+		Status:          string(e.Status),
+		CreatedAt:       e.CreatedAt,
+	}
+	if e.EventType == model.EventTourSession {
+		if session, err := s.TourSessionRepo.FindByEventID(e.ID); err == nil {
+			resp.TourID = session.TourID
+			resp.GuideID = session.GuideID
+		}
+	} else if e.EventType == model.EventActivity {
+		if activity, err := s.ActivityRepo.FindByEventID(e.ID); err == nil {
+			resp.ActivityType = string(activity.ActivityType)
+		}
+	}
+	return resp
 }
 
 func (s *ReservationService) GetUserReservations(touristID string) ([]model.Reservation, error) {
 	return s.ReservationRepo.FindByTourist(touristID)
+}
+
+func (s *ReservationService) GetReservationByID(id uuid.UUID) (*model.Reservation, error) {
+	return s.ReservationRepo.FindByID(id)
 }
 
 func (s *ReservationService) GetSeatsForEvent(eventID uuid.UUID) ([]dto.SeatResponse, error) {

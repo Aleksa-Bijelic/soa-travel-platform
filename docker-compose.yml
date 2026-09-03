@@ -170,11 +170,14 @@ services:
       NATS_USER: ${NATS_USER:-natscon}
       NATS_PASSWORD: ${NATS_PASSWORD:-admin}
       TOUR_SERVICE_GRPC_ADDR: tour-app:50051
+      RESERVATION_SERVICE_URL: http://reservation-app:8085
     depends_on:
       purchase-db:
         condition: service_healthy
       nats:
         condition: service_healthy
+      reservation-app:
+        condition: service_started
     ports:
       - "8086:8083"
     logging: *fluent-bit

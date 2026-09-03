@@ -12,6 +12,7 @@ export default defineConfig({
       '/followers': 'http://localhost:8080',
       '/purchase': 'http://localhost:8080',
       '/blog/': 'http://localhost:8080',
+      '/reservations': 'http://localhost:8080',
     },
   },
 })

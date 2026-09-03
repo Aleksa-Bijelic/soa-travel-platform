@@ -28,6 +28,10 @@ type Event struct {
 	Name            string      `gorm:"type:text;not null"`
 	Description     string      `gorm:"type:text"`
 	Location        string      `gorm:"type:text"`
+	City            string      `gorm:"type:text;index"`
+	Latitude        *float64    `gorm:"type:double precision"`
+	Longitude       *float64    `gorm:"type:double precision"`
+	ImageURL        string      `gorm:"type:text"`
 	EventDate       time.Time   `gorm:"type:timestamptz;not null"`
 	MaxCapacity     int         `gorm:"type:int;not null"`
 	PricePerPerson  float64     `gorm:"type:decimal(10,2);not null"`

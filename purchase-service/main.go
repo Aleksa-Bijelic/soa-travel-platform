@@ -110,10 +110,15 @@ func main() {
 	cartRepo := &repo.CartRepository{DB: database}
 	purchaseRepo := &repo.PurchaseRepository{DB: database}
 	tourClient := grpcclient.NewTourClient(os.Getenv("TOUR_SERVICE_GRPC_ADDR"))
+	reservationURL := os.Getenv("RESERVATION_SERVICE_URL")
+	if reservationURL == "" {
+		reservationURL = "http://reservation-app:8085"
+	}
 	purchaseService := &service.PurchaseService{
-		CartRepo:     cartRepo,
-		PurchaseRepo: purchaseRepo,
-		TourClient:   tourClient,
+		CartRepo:          cartRepo,
+		PurchaseRepo:      purchaseRepo,
+		TourClient:        tourClient,
+		ReservationClient: service.NewReservationClient(reservationURL),
 	}
 	purchaseHandler := &handler.PurchaseHandler{Service: purchaseService}
 
@@ -132,6 +137,7 @@ func main() {
 
 	router.HandleFunc("/cart", purchaseHandler.GetCart).Methods("GET")
 	router.HandleFunc("/cart", purchaseHandler.AddCartItem).Methods("POST")
+	router.HandleFunc("/cart/reservation", purchaseHandler.AddReservationToCart).Methods("POST")
 	router.HandleFunc("/cart/{id}", purchaseHandler.RemoveCartItem).Methods("DELETE")
 	router.HandleFunc("/checkout", purchaseHandler.Checkout).Methods("POST")
 	router.HandleFunc("/purchases", purchaseHandler.GetPurchases).Methods("GET")

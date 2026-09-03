@@ -3,22 +3,19 @@ package handler
 import (
 	"encoding/json"
 	"errors"
-	"log"
 	"net/http"
 
 	"example.com/reservation-service/dto"
 	"example.com/reservation-service/middleware"
+	"example.com/reservation-service/repo"
 	"example.com/reservation-service/service"
-	saga "saga"
-	reserveseat "saga/reserve_seat"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
 type ReservationHandler struct {
-	Service   *service.ReservationService
-	Publisher saga.Publisher
+	Service *service.ReservationService
 }
 
 func (h *ReservationHandler) CreateEvent(w http.ResponseWriter, r *http.Request) {
@@ -45,45 +42,30 @@ func (h *ReservationHandler) CreateEvent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	writeJSON(w, event)
+	count, _ := h.Service.EventRepo.CountReservations(event.ID)
+	writeJSON(w, h.Service.EnrichEvent(*event, count))
 }
 
 func (h *ReservationHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
-	eventType := r.URL.Query().Get("type")
-	status := r.URL.Query().Get("status")
+	q := r.URL.Query()
+	filter := repo.EventFilter{
+		EventType: q.Get("type"),
+		Status:    q.Get("status"),
+		City:      q.Get("city"),
+		Category:  q.Get("category"),
+		Search:    q.Get("search"),
+	}
 
-	events, err := h.Service.GetEvents(eventType, status)
+	events, err := h.Service.GetEvents(filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Enrich with current reservation counts
-	type enrichedEvent struct {
-		dto.EventResponse
-		CurrentReserved int `json:"current_reserved"`
-		AvailableSpots  int `json:"available_spots"`
-	}
-
-	var result []enrichedEvent
+	result := make([]dto.EventResponse, 0, len(events))
 	for _, e := range events {
 		count, _ := h.Service.EventRepo.CountReservations(e.ID)
-		result = append(result, enrichedEvent{
-			EventResponse: dto.EventResponse{
-				ID:             e.ID.String(),
-				EventType:      string(e.EventType),
-				Name:           e.Name,
-				Description:    e.Description,
-				Location:       e.Location,
-				EventDate:      e.EventDate,
-				MaxCapacity:    e.MaxCapacity,
-				PricePerPerson: e.PricePerPerson,
-				Status:         string(e.Status),
-				CreatedAt:      e.CreatedAt,
-			},
-			CurrentReserved: int(count),
-			AvailableSpots:  e.MaxCapacity - int(count),
-		})
+		result = append(result, h.Service.EnrichEvent(e, count))
 	}
 
 	writeJSON(w, result)
@@ -105,29 +87,18 @@ func (h *ReservationHandler) GetEvent(w http.ResponseWriter, r *http.Request) {
 
 	count, _ := h.Service.EventRepo.CountReservations(eventID)
 
-	resp := dto.EventResponse{
-		ID:              event.ID.String(),
-		EventType:       string(event.EventType),
-		Name:            event.Name,
-		Description:     event.Description,
-		Location:        event.Location,
-		EventDate:       event.EventDate,
-		MaxCapacity:     event.MaxCapacity,
-		CurrentReserved: int(count),
-		AvailableSpots:  event.MaxCapacity - int(count),
-		PricePerPerson:  event.PricePerPerson,
-		Status:          string(event.Status),
-		CreatedAt:       event.CreatedAt,
-	}
-
-	writeJSON(w, resp)
+	writeJSON(w, h.Service.EnrichEvent(*event, count))
 }
 
 func (h *ReservationHandler) ReserveSeat(w http.ResponseWriter, r *http.Request) {
-	log.Println("[RESERVE] Handler entered")
-	userID, err := getUserID(r)
+	userID, role, err := getUserIDAndRole(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	if role != "tourist" {
+		http.Error(w, "only tourists can reserve seats", http.StatusForbidden)
 		return
 	}
 
@@ -137,18 +108,15 @@ func (h *ReservationHandler) ReserveSeat(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid event id", http.StatusBadRequest)
 		return
 	}
-	log.Printf("[RESERVE] user=%s event=%s", userID, eventID)
 
 	var req dto.ReserveRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Printf("[RESERVE] calling service with seat=%v", req.SeatNumber)
 
 	reservation, err := h.Service.ReserveSeat(eventID, userID, req)
 	if err != nil {
-		log.Printf("[RESERVE] error: %v", err)
 		status := http.StatusBadRequest
 		if errors.Is(err, errors.New("event is full")) {
 			status = http.StatusConflict
@@ -156,26 +124,25 @@ func (h *ReservationHandler) ReserveSeat(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), status)
 		return
 	}
-	log.Printf("[RESERVE] success: %s", reservation.ID)
 
-	// Publish payment command via NATS saga
-	if h.Publisher != nil {
-		event, err := h.Service.GetEventByID(eventID)
-		if err == nil {
-			cmd := reserveseat.ReservationCommand{
-				ReservationID: reservation.ID.String(),
-				EventID:       eventID.String(),
-				UserID:        userID,
-				Amount:        event.PricePerPerson,
-				Type:          reserveseat.ProcessPayment,
-			}
-			if err := h.Publisher.Publish(cmd); err != nil {
-				log.Printf("Failed to publish payment command for reservation %s: %v", reservation.ID, err)
-			}
-		}
+	event, _ := h.Service.GetEventByID(eventID)
+
+	resp := dto.ReservationResponse{
+		ID:           reservation.ID.String(),
+		EventID:      reservation.EventID.String(),
+		TouristID:    reservation.TouristID,
+		SeatNumber:   reservation.SeatNumber,
+		Status:       string(reservation.Status),
+		ReservedAt:   reservation.ReservedAt,
+		ExpiresAt:    reservation.ExpiresAt,
+	}
+	if event != nil {
+		resp.EventName = event.Name
+		resp.EventDate = event.EventDate
+		resp.PricePerPerson = event.PricePerPerson
 	}
 
-	writeJSON(w, reservation)
+	writeJSON(w, resp)
 }
 
 func (h *ReservationHandler) CancelReservation(w http.ResponseWriter, r *http.Request) {
@@ -214,6 +181,9 @@ func (h *ReservationHandler) GetSeats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if seats == nil {
+		seats = []dto.SeatResponse{}
+	}
 	writeJSON(w, seats)
 }
 
@@ -230,12 +200,11 @@ func (h *ReservationHandler) GetMyReservations(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Enrich with event names
 	type enrichedReservation struct {
 		dto.ReservationResponse
 	}
 
-	var result []enrichedReservation
+	result := make([]enrichedReservation, 0)
 	for _, res := range reservations {
 		resp := dto.ReservationResponse{
 			ID:         res.ID.String(),
@@ -245,10 +214,12 @@ func (h *ReservationHandler) GetMyReservations(w http.ResponseWriter, r *http.Re
 			SeatNumber: res.SeatNumber,
 			Status:     string(res.Status),
 			ReservedAt: res.ReservedAt,
+			ExpiresAt:  res.ExpiresAt,
 		}
 		if event, err := h.Service.GetEventByID(res.EventID); err == nil {
 			resp.EventName = event.Name
 			resp.EventDate = event.EventDate
+			resp.PricePerPerson = event.PricePerPerson
 		}
 		result = append(result, enrichedReservation{ReservationResponse: resp})
 	}
@@ -265,11 +236,53 @@ func (h *ReservationHandler) ConfirmReservation(w http.ResponseWriter, r *http.R
 	}
 
 	if err := h.Service.ConfirmReservation(reservationID); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	writeJSON(w, map[string]string{"status": "confirmed"})
+}
+
+func (h *ReservationHandler) GetReservation(w http.ResponseWriter, r *http.Request) {
+	userID, err := getUserID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	vars := mux.Vars(r)
+	reservationID, err := uuid.Parse(vars["id"])
+	if err != nil {
+		http.Error(w, "invalid reservation id", http.StatusBadRequest)
+		return
+	}
+
+	reservation, err := h.Service.GetReservationByID(reservationID)
+	if err != nil {
+		http.Error(w, "reservation not found", http.StatusNotFound)
+		return
+	}
+	if reservation.TouristID != userID {
+		http.Error(w, "unauthorized", http.StatusForbidden)
+		return
+	}
+
+	event, _ := h.Service.GetEventByID(reservation.EventID)
+	resp := dto.ReservationResponse{
+		ID:         reservation.ID.String(),
+		EventID:    reservation.EventID.String(),
+		TouristID:  reservation.TouristID,
+		SeatNumber: reservation.SeatNumber,
+		Status:     string(reservation.Status),
+		ReservedAt: reservation.ReservedAt,
+		ExpiresAt:  reservation.ExpiresAt,
+	}
+	if event != nil {
+		resp.EventName = event.Name
+		resp.EventDate = event.EventDate
+		resp.PricePerPerson = event.PricePerPerson
+	}
+	writeJSON(w, resp)
 }
 
 func getUserID(r *http.Request) (string, error) {

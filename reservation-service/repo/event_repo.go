@@ -23,17 +23,37 @@ func (r *EventRepository) FindByID(id uuid.UUID) (*model.Event, error) {
 	return &event, err
 }
 
-func (r *EventRepository) FindAll(eventType, status string) ([]model.Event, error) {
+type EventFilter struct {
+	EventType string
+	Status    string
+	City      string
+	Category  string // activity_type, e.g. "concert" | "theater" | "open_air_cinema"
+	Search    string
+}
+
+func (r *EventRepository) FindAll(f EventFilter) ([]model.Event, error) {
 	var events []model.Event
-	q := r.DB
-	if eventType != "" {
-		q = q.Where("event_type = ?", eventType)
+	q := r.DB.Model(&model.Event{})
+	if f.EventType != "" {
+		q = q.Where("events.event_type = ?", f.EventType)
 	}
-	if status != "" {
-		q = q.Where("status = ?", status)
+	if f.Status != "" {
+		q = q.Where("events.status = ?", f.Status)
 	}
-	q = q.Where("event_date > NOW()")
-	err := q.Order("event_date ASC").Find(&events).Error
+	if f.City != "" {
+		q = q.Where("LOWER(events.city) = LOWER(?)", f.City)
+	}
+	if f.Category != "" {
+		q = q.Joins("JOIN activities ON activities.event_id = events.id").
+			Where("activities.activity_type = ?", f.Category)
+	}
+	if f.Search != "" {
+		like := "%" + f.Search + "%"
+		q = q.Where("events.name ILIKE ? OR events.description ILIKE ? OR events.location ILIKE ? OR events.city ILIKE ?",
+			like, like, like, like)
+	}
+	q = q.Where("events.event_date > NOW()")
+	err := q.Order("events.event_date ASC").Find(&events).Error
 	return events, err
 }
 
