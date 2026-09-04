@@ -110,6 +110,9 @@ export const api = {
   getPurchases: (token) =>
     req('GET', '/purchase/purchases', undefined, token),
 
+  getPurchaseStatus: (tourId, token) =>
+    req('GET', `/purchase/status/${tourId}`, undefined, token),
+
   getReviews: (tourId, token) =>
     req('GET', `/tours/tours/${tourId}/reviews`, undefined, token),
 

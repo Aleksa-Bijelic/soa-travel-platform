@@ -60,6 +60,12 @@ export default function SeatSelectionPage() {
   if (eventError) return <div className="container" style={{ padding: 40 }}><ErrBanner>{eventError.message}</ErrBanner></div>;
   if (!event) return null;
 
+  // Guided sessions book by headcount, not by seat.
+  if (event.event_type === 'tour_session') {
+    navigate(`/events/${id}/book`, { replace: true });
+    return null;
+  }
+
   const maxTickets = Math.max(1, Math.min(MAX_TICKETS, event.available_spots));
   const soldOut = event.status === 'full' || event.available_spots <= 0;
 

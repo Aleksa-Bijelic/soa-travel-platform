@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { useAuth } from '../context/AuthContext';
@@ -24,6 +24,108 @@ const CATEGORY_HINTS = {
 function MapClick({ onPick }) {
   useMapEvents({ click: (e) => onPick(e.latlng) });
   return null;
+}
+
+function TourPicker({ tours, selectedId, onSelect }) {
+  const [open, setOpen] = useState(false);
+  const selected = tours.find((t) => t.id === selectedId);
+
+  const pick = (tour) => {
+    onSelect(tour);
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: 'relative', marginBottom: 6 }}>
+      <button type="button" onClick={() => setOpen((o) => !o)}
+        className="input"
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          cursor: 'pointer', textAlign: 'left',
+        }}>
+        {selected ? (
+          <>
+            <TourThumb tour={selected} size={34} />
+            <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+              {selected.name}
+            </span>
+          </>
+        ) : (
+          <span className="faint">— Choose a tour —</span>
+        )}
+        <span style={{
+          marginLeft: 'auto', flexShrink: 0, transition: 'transform .15s',
+          transform: open ? 'rotate(180deg)' : 'none', color: 'var(--ink-faint)',
+        }}>▾</span>
+      </button>
+
+      {open && (
+        <>
+          <div onClick={() => setOpen(false)}
+            style={{ position: 'fixed', inset: 0, zIndex: 40, cursor: 'default' }} />
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, zIndex: 41,
+            background: 'var(--paper)', border: '1px solid var(--sage-line)', borderRadius: 12,
+            boxShadow: '0 12px 32px rgba(60,60,40,.18)', padding: 6,
+            maxHeight: 300, overflowY: 'auto',
+          }}>
+            {tours.map((t) => {
+              const keyPoints = [...(t.keyPoints || [])].sort((a, b) => a.order - b.order);
+              const activeTour = t.id === selectedId;
+              return (
+                <button key={t.id} type="button" onClick={() => pick(activeTour ? null : t)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+                    padding: 8, borderRadius: 9, cursor: 'pointer', textAlign: 'left',
+                    border: `2px solid ${activeTour ? 'var(--sage-deep)' : 'transparent'}`,
+                    background: activeTour ? 'var(--paper-deep)' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => { if (!activeTour) e.currentTarget.style.background = 'var(--paper-deep)'; }}
+                  onMouseLeave={(e) => { if (!activeTour) e.currentTarget.style.background = 'transparent'; }}>
+                  <TourThumb tour={t} size={46} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.name}
+                    </span>
+                    <span className="faint" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
+                      {keyPoints.length} stop{keyPoints.length !== 1 ? 's' : ''}
+                      {keyPoints[0] ? ` · from ${keyPoints[0].name}` : ''} · €{t.price}
+                    </span>
+                  </span>
+                  {activeTour && (
+                    <span className="badge" style={{ background: 'var(--sage-deep)', color: '#fff', fontSize: 10, flexShrink: 0 }}>
+                      Selected
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function TourThumb({ tour, size }) {
+  const keyPoints = [...(tour.keyPoints || [])].sort((a, b) => a.order - b.order);
+  const src = keyPoints[0]?.imageUrl;
+  if (src) {
+    return (
+      <img src={src} alt=""
+        style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0, display: 'block' }} />
+    );
+  }
+  return (
+    <span style={{
+      width: size, height: size, borderRadius: 8, flexShrink: 0,
+      background: 'linear-gradient(135deg, var(--sage-light), var(--paper-deep))',
+      display: 'grid', placeItems: 'center',
+      fontFamily: 'var(--serif)', fontSize: size * 0.45, color: 'var(--sage-deep)',
+    }}>
+      {tour.name?.[0]?.toUpperCase() || '?'}
+    </span>
+  );
 }
 
 function pinIcon() {
@@ -65,6 +167,41 @@ export default function CreateEventPage() {
     mutationFn: (data) => reservationApi.createEvent(data, token),
     onSuccess: () => navigate('/events'),
   });
+
+  // Guide's tours for the session dropdown (published only).
+  const { data: myTours = [] } = useQuery({
+    queryKey: ['my-tours'],
+    queryFn: () => tourApi.getMyTours(token),
+    enabled: Boolean(token) && !isActivity,
+  });
+  const publishedTours = (myTours || []).filter((t) => t.status === 'Published');
+
+  // Prefill the session from the picked tour: name/description from the tour,
+  // meeting point + map pin + cover from its first key point.
+  const handleTourSelect = (tour) => {
+    if (!tour) {
+      setForm((f) => ({ ...f, tour_id: '', name: '', description: '', location: '', image_url: '' }));
+      setPin(null);
+      return;
+    }
+    const keyPoints = [...(tour.keyPoints || [])].sort((a, b) => a.order - b.order);
+    const first = keyPoints[0];
+    setForm((f) => ({
+      ...f,
+      tour_id: tour.id,
+      name: tour.name || '',
+      description: tour.description || '',
+      location: first?.name || '',
+      image_url: first?.imageUrl || '',
+      city: '',
+    }));
+    if (first) {
+      setPin({ lat: first.latitude, lng: first.longitude });
+    } else {
+      setPin(null);
+    }
+    setGeoError(null);
+  };
 
   if (user?.role !== 'guide') {
     navigate('/events');
@@ -110,6 +247,10 @@ export default function CreateEventPage() {
       setFormError('Please pick the venue location on the map.');
       return;
     }
+    if (!isActivity && !form.tour_id) {
+      setFormError('Please choose one of your published tours.');
+      return;
+    }
     const payload = {
       name: form.name,
       description: form.description,
@@ -128,6 +269,10 @@ export default function CreateEventPage() {
     } else {
       payload.tour_id = form.tour_id;
       payload.max_capacity = parseInt(form.max_capacity, 10) || 0;
+      if (pin) {
+        payload.latitude = pin.lat;
+        payload.longitude = pin.lng;
+      }
     }
     createMutation.mutate(payload);
   };
@@ -140,8 +285,7 @@ export default function CreateEventPage() {
     color: active ? '#fff' : 'var(--ink)',
     fontWeight: 600, fontSize: 14, transition: 'all .15s',
   });
-  const submitDisabled = createMutation.isPending || uploading || (isActivity && geoLoading);
-  const mutationError = createMutation.isError ? createMutation.error.message : null;
+  const submitDisabled = createMutation.isPending || uploading || geoLoading;
 
   return (
     <div className="container" style={{ padding: '40px 0 80px', maxWidth: 640, margin: '0 auto' }}>
@@ -164,13 +308,24 @@ export default function CreateEventPage() {
             </button>
             <button type="button" style={typeBtn(!isActivity)}
               onClick={() => setForm((f) => ({ ...f, event_type: 'tour_session' }))}>
-              Tour Session
+              Guided Tour
             </button>
           </div>
 
           {!isActivity && (
-            <div className="card p-12" style={{ background: 'var(--paper-deep)', marginBottom: 14, fontSize: 13, lineHeight: 1.5 }}>
-              <strong>Tour Session</strong> — You are scheduling a specific date/time for one of your published tours.
+            <div className="card p-16 fade-up" style={{
+              background: 'var(--paper-deep)', marginBottom: 16, fontSize: 13, lineHeight: 1.6,
+              borderLeft: '4px solid var(--sage-deep)', display: 'flex', gap: 12, alignItems: 'flex-start',
+            }}>
+              <span style={{
+                width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                background: 'var(--sage-deep)', color: '#fff',
+                display: 'grid', placeItems: 'center', fontFamily: 'var(--serif)', fontWeight: 700,
+              }}>i</span>
+              <p style={{ margin: 0, color: 'var(--ink-soft)' }}>
+                <strong style={{ color: 'var(--ink)' }}>Guided Tour</strong> — pick one of your published tours
+                below and schedule a date &amp; time. Only travellers who purchased the tour can reserve it.
+              </p>
             </div>
           )}
 
@@ -201,19 +356,69 @@ export default function CreateEventPage() {
             </>
           )}
 
-          <label className="label">Name</label>
-          <input className="input" value={form.name} onChange={update('name')} required
-            placeholder={isActivity ? 'e.g. Summer Jazz Night' : 'e.g. Morning City Walk — Dec 15'}
-            style={inputStyle} />
+          {!isActivity && (
+            <>
+              <label className="label">Your Published Tour</label>
+              {publishedTours.length === 0 ? (
+                <div className="empty" style={{ padding: 20, marginBottom: 14 }}>
+                  <p style={{ margin: 0 }}>You have no published tours yet. Publish a tour first, then schedule its session here.</p>
+                </div>
+              ) : (
+                <TourPicker tours={publishedTours} selectedId={form.tour_id} onSelect={handleTourSelect} />
+              )}
+              {form.tour_id && (
+                <p className="faint" style={{ fontSize: 12, marginBottom: 14 }}>
+                  Name, description, meeting point and cover are filled from the tour — date, capacity and price are yours to set.
+                </p>
+              )}
 
-          <label className="label">Description</label>
-          <textarea className="input" value={form.description} onChange={update('description')}
-            rows={3} style={{ ...inputStyle, resize: 'vertical' }}
-            placeholder="What can visitors expect?" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label className="label">Name <span className="faint" style={{ fontWeight: 400 }}>(from tour)</span></label>
+                  <input className="input" value={form.name} readOnly
+                    placeholder="Pick a tour above" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="label">Max Capacity</label>
+                  <input className="input" type="number" min={1} value={form.max_capacity}
+                    onChange={(e) => setForm((f) => ({ ...f, max_capacity: Number(e.target.value) }))} required style={inputStyle} />
+                </div>
+              </div>
 
-          <label className="label">Cover image <span className="faint" style={{ fontWeight: 400 }}>(optional)</span></label>
-          <input type="file" accept="image/*" onChange={(e) => handleImageFile(e.target.files?.[0] || null)}
-            style={{ marginBottom: 10 }} />
+              <label className="label">Description <span className="faint" style={{ fontWeight: 400 }}>(from tour)</span></label>
+              <textarea className="input" value={form.description} readOnly
+                rows={3} style={{ ...inputStyle, resize: 'vertical' }}
+                placeholder="Pick a tour above" />
+
+              <label className="label">Meeting point <span className="faint" style={{ fontWeight: 400 }}>(first stop, editable)</span></label>
+              <input className="input" value={form.location} onChange={update('location')}
+                required placeholder="e.g. Main Square" style={inputStyle} />
+              {pin && (
+                <p className="faint" style={{ fontSize: 12, marginBottom: 14 }}>
+                  Map pin set from the first stop: {pin.lat.toFixed(5)}°, {pin.lng.toFixed(5)}°
+                </p>
+              )}
+            </>
+          )}
+
+          {isActivity && (
+            <>
+              <label className="label">Name</label>
+              <input className="input" value={form.name} onChange={update('name')} required
+                placeholder="e.g. Summer Jazz Night" style={inputStyle} />
+
+              <label className="label">Description</label>
+              <textarea className="input" value={form.description} onChange={update('description')}
+                rows={3} style={{ ...inputStyle, resize: 'vertical' }}
+                placeholder="What can visitors expect?" />
+            </>
+          )}
+
+          <label className="label">Cover image <span className="faint" style={{ fontWeight: 400 }}>(optional{!isActivity ? ', defaults to first stop' : ''})</span></label>
+          <div style={{ marginBottom: 10 }}>
+            <input type="file" accept="image/*" onChange={(e) => handleImageFile(e.target.files?.[0] || null)}
+              style={{ display: 'block', width: '100%' }} />
+          </div>
           {uploading && <p className="faint" style={{ fontSize: 13, marginBottom: 10 }}>Uploading image…</p>}
           {form.image_url && (
             <div style={{ marginBottom: 14, borderRadius: 10, overflow: 'hidden', height: 180 }}>
@@ -280,45 +485,19 @@ export default function CreateEventPage() {
                 })}
               </div>
             </>
-          ) : (
-            <>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div>
-                  <label className="label">Location</label>
-                  <input className="input" value={form.location} onChange={update('location')} required style={inputStyle} />
-                </div>
-                <div>
-                  <label className="label">City</label>
-                  <input className="input" value={form.city} onChange={update('city')}
-                    placeholder="e.g. Novi Sad" style={inputStyle} />
-                </div>
-              </div>
-              <label className="label">Tour ID</label>
-              <input className="input" value={form.tour_id} onChange={update('tour_id')}
-                placeholder="UUID of your published tour from tour-service" required style={inputStyle} />
-            </>
-          )}
+          ) : null}
 
           <label className="label">Date & Time</label>
           <input className="input" type="datetime-local" value={form.event_date} onChange={update('event_date')}
             required style={inputStyle} />
 
-          <div style={{ display: 'grid', gridTemplateColumns: isActivity ? '1fr' : '1fr 1fr', gap: 12 }}>
-            {!isActivity && (
-              <div>
-                <label className="label">Max Capacity</label>
-                <input className="input" type="number" min={1} value={form.max_capacity}
-                  onChange={(e) => setForm((f) => ({ ...f, max_capacity: Number(e.target.value) }))} required style={inputStyle} />
-              </div>
-            )}
-            <div>
-              <label className="label">Price per Person (€)</label>
-              <input className="input" type="number" step="0.01" min={0} value={form.price_per_person}
-                onChange={update('price_per_person')} required style={inputStyle} />
-            </div>
-          </div>
+          <label className="label">Price per Person (€)</label>
+          <input className="input" type="number" step="0.01" min={0} value={form.price_per_person}
+            onChange={update('price_per_person')} required style={inputStyle} />
 
-          {(formError || mutationError) && <ErrBanner>{formError || mutationError}</ErrBanner>}
+          {(formError || (createMutation.isError && createMutation.error.message)) && (
+            <ErrBanner>{formError || createMutation.error.message}</ErrBanner>
+          )}
 
           <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
             <Btn variant="ghost" onClick={() => navigate('/events')}>Cancel</Btn>

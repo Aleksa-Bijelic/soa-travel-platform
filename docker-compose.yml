@@ -176,8 +176,6 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-      reservation-app:
-        condition: service_started
     ports:
       - "8086:8083"
     logging: *fluent-bit
@@ -221,6 +219,7 @@ services:
       DB_SSLMODE: disable
       JWT_SECRET: ${JWT_SECRET}
       TOUR_SERVICE_GRPC_ADDR: tour-app:50051
+      PURCHASE_GRPC_ADDR: purchase-app:50051
       NATS_HOST: ${NATS_HOST:-nats}
       NATS_PORT: ${NATS_PORT:-4222}
       NATS_USER: ${NATS_USER:-natscon}
@@ -228,6 +227,8 @@ services:
     depends_on:
       reservation-db:
         condition: service_healthy
+      purchase-app:
+        condition: service_started
     logging: *fluent-bit
 
   reservation-db:

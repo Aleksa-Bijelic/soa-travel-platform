@@ -79,7 +79,7 @@ export default function EventDetailPage() {
             </div>
             <div className="stat">
               <span className="v" style={{ fontSize: 22 }}>{event.city || event.location || '—'}</span>
-              <span className="l">City</span>
+              <span className="l">{event.city ? 'City' : 'Meeting point'}</span>
             </div>
             <div className="stat">
               <span className="v" style={{ fontFamily: 'var(--serif)' }}>€{event.price_per_person?.toFixed(2)}</span>
@@ -95,8 +95,9 @@ export default function EventDetailPage() {
           </div>
           <div className="row gap-12" style={{ marginTop: 18, alignItems: 'center' }}>
             {user?.role === 'tourist' && !soldOut && (
-              <Btn variant="primary" icon="cart" onClick={() => navigate(`/events/${event.id}/seats`)}>
-                Choose Seats
+              <Btn variant="primary" icon="cart"
+                onClick={() => navigate(isTour ? `/events/${event.id}/book` : `/events/${event.id}/seats`)}>
+                {isTour ? 'Reserve Spots' : 'Choose Seats'}
               </Btn>
             )}
             {user?.role === 'tourist' && soldOut && (
@@ -107,7 +108,9 @@ export default function EventDetailPage() {
             )}
             {!soldOut && (
               <span className="faint" style={{ fontSize: 13 }}>
-                Seats stay locked for 5 minutes after reserving — complete checkout to confirm.
+                {isTour
+                  ? 'Spots stay locked for 5 minutes after reserving — complete checkout to confirm.'
+                  : 'Seats stay locked for 5 minutes after reserving — complete checkout to confirm.'}
               </span>
             )}
           </div>
@@ -144,7 +147,7 @@ export default function EventDetailPage() {
           <h3 style={{ marginTop: 4, marginBottom: 4 }}>Event details</h3>
           <DetailRow icon={ICONS.tag || ICONS.pin} label="Category" value={categoryLabel(event)} />
           <DetailRow icon={ICONS.clock} label="Date & time" value={formatDate(event.event_date)} />
-          <DetailRow icon={ICONS.pin} label="Venue" value={event.city ? `${event.location}, ${event.city}` : event.location} />
+          <DetailRow icon={ICONS.pin} label="Location" value={event.city ? `${event.location}, ${event.city}` : event.location} />
           <DetailRow icon={ICONS.cart} label="Price" value={`${event.price_per_person?.toFixed(2)} € per seat`} />
           <div style={{ padding: '12px 0', borderTop: '0.5px dashed var(--sage-line)' }}>
             <div className="row between" style={{ alignItems: 'baseline' }}>

@@ -93,10 +93,15 @@ func (s *PurchaseService) AddReservationToCart(userID uuid.UUID, reservationID, 
 		}
 	}
 
+	description := "Guided tour reservation — per person"
+	if seatNumber != nil {
+		description = "Event reservation — seat " + fmt.Sprintf("%d", *seatNumber)
+	}
+
 	cartItem := &model.CartItem{
 		UserID:             userID,
 		TourName:           eventName,
-		TourDescription:    "Event reservation — seat " + fmt.Sprintf("%d", derefInt(seatNumber)),
+		TourDescription:    description,
 		Price:              price,
 		ItemType:           "reservation",
 		ReservationID:      &reservationID,
@@ -109,13 +114,6 @@ func (s *PurchaseService) AddReservationToCart(userID uuid.UUID, reservationID, 
 	}
 
 	return mapCartItem(cartItem), nil
-}
-
-func derefInt(i *int) int {
-	if i == nil {
-		return 0
-	}
-	return *i
 }
 
 func (s *PurchaseService) GetCart(userID uuid.UUID, authHeader string) (*dto.CartResponse, error) {
@@ -462,6 +460,10 @@ func mapCartItem(item *model.CartItem) *dto.CartItemResponse {
 	if item.ReservationID != nil {
 		resID := item.ReservationID.String()
 		resp.ReservationID = resID
+	}
+	if item.ReservationEventID != nil {
+		eventID := item.ReservationEventID.String()
+		resp.ReservationEventID = eventID
 	}
 	return resp
 }

@@ -21,6 +21,7 @@ type ReservationService struct {
 	TourSessionRepo *repo.TourSessionRepository
 	ActivityRepo    *repo.ActivityRepository
 	TourClient      *grpcclient.TourClient
+	PurchaseClient  *grpcclient.PurchaseClient
 	DB              *gorm.DB
 }
 
@@ -71,6 +72,19 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 		if !published {
 			return nil, errors.New("tour is not published")
 		}
+		// City is optional for tour sessions (meeting point carries the location).
+		// Name/description always come from the tour itself (source of truth).
+		if info, err := s.TourClient.GetTourPublicInfo(req.TourID); err == nil && info != nil {
+			if info.Name != "" {
+				event.Name = info.Name
+			}
+			if info.Description != "" {
+				event.Description = info.Description
+			}
+		}
+		if event.Name == "" {
+			return nil, errors.New("name is required")
+		}
 		if err := s.EventRepo.Create(event); err != nil {
 			return nil, err
 		}
@@ -120,16 +134,19 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 // Flow:
 // 1. BEGIN transaction
 // 2. LOCK event row (SELECT ... FOR UPDATE) — concurrent requests for the
-//    same event serialize here, so two tourists can never take the same seat.
-// 3. Check capacity
-// 4. Check seat availability inside the lock (for activities / seated events)
-// 5. For tour sessions: reject a second active reservation by the same tourist
-//    (activities allow multiple seats per tourist, one reservation per seat)
+//    same event serialize here, so capacity can never be oversold and two
+//    tourists can never take the same seat.
+// 3. Check capacity (active reservations vs max_capacity)
+// 4. Check seat availability inside the lock (activities always carry a seat;
+//    tour sessions book per-person rows without seat numbers)
+// 5. For tour sessions: the tourist must have purchased the tour first
 // 6. INSERT reservation (seat-level partial unique index is the final guard)
 // 7. UPDATE event status if full
 // 8. COMMIT
 //
-// If any step fails, the entire transaction is rolled back.
+// A tourist may hold several active reservations per event (multiple seats
+// or several people on a session) — one row per person. If any step fails,
+// the entire transaction is rolled back.
 func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, req dto.ReserveRequest) (*model.Reservation, error) {
 	var result *model.Reservation
 
@@ -173,16 +190,21 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 			return errors.New("seat_number is required for activities")
 		}
 
-		// Step 5: For tour sessions a tourist may hold only one active
-		// reservation. Activities allow several (one reservation per seat),
-		// seat uniqueness is enforced by the check above + DB index below.
+		// Step 5: Tour sessions can only be booked by tourists who
+		// previously purchased the tour itself.
 		if event.EventType == model.EventTourSession {
-			isNew, err := s.ReservationRepo.CheckDuplicateReservation(tx, eventID, touristID)
+			session, err := s.TourSessionRepo.FindByEventID(eventID)
 			if err != nil {
-				return err
+				return errors.New("tour session not found")
 			}
-			if !isNew {
-				return errors.New("you already have an active reservation for this event")
+			purchased, err := s.PurchaseClient.HasPurchased(touristID, session.TourID)
+			if err != nil {
+				log.Printf("[RESERVATION] purchase check failed for tourist %s tour %s: %v", touristID, session.TourID, err)
+				return fmt.Errorf("failed to verify tour purchase: %w", err)
+			}
+			log.Printf("[RESERVATION] purchase check tourist %s tour %s: purchased=%v", touristID, session.TourID, purchased)
+			if !purchased {
+				return errors.New("you must purchase the tour before reserving this session")
 			}
 		}
 

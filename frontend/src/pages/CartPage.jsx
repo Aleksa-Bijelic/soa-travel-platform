@@ -1,8 +1,11 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/tourApi';
+import { reservationApi } from '../api/reservationApi';
 import { useAuth } from '../context/AuthContext';
-import { Btn, ErrBanner } from '../components';
+import { categoryLabel, eventCover } from '../utils/eventCategories';
+import { Btn, Icon, ICONS, ErrBanner } from '../components';
 
 export default function CartPage() {
   const { token } = useAuth();
@@ -16,6 +19,47 @@ export default function CartPage() {
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
   });
+
+  // Covers: published tours for tour items, events for reservation items.
+  const { data: published = [] } = useQuery({
+    queryKey: ['published-tours'],
+    queryFn: () => api.getPublishedTours(token),
+    enabled: Boolean(token),
+    staleTime: 60_000,
+  });
+  const { data: events = [] } = useQuery({
+    queryKey: ['events'],
+    queryFn: () => reservationApi.getEvents(token, {}),
+    enabled: Boolean(token),
+    staleTime: 60_000,
+  });
+
+  const tourCovers = useMemo(() => {
+    const map = {};
+    (published || []).forEach((t) => {
+      if (t?.firstKeyPoint?.imageUrl) map[t.id] = t.firstKeyPoint.imageUrl;
+    });
+    return map;
+  }, [published]);
+  const eventInfo = useMemo(() => {
+    const map = {};
+    (events || []).forEach((ev) => { map[ev.id] = ev; });
+    return map;
+  }, [events]);
+
+  // Fallback for cart items created before reservation_event_id existed:
+  // resolve the event through the reservation itself.
+  const { data: reservationsData } = useQuery({
+    queryKey: ['my-reservations'],
+    queryFn: () => reservationApi.getMyReservations(token),
+    enabled: Boolean(token),
+    staleTime: 30_000,
+  });
+  const reservationEvents = useMemo(() => {
+    const map = {};
+    (reservationsData || []).forEach((r) => { map[r.id] = r.event_id; });
+    return map;
+  }, [reservationsData]);
 
   const checkoutMut = useMutation({
     mutationFn: () => api.checkoutCart(token),
@@ -66,20 +110,55 @@ export default function CartPage() {
             </div>
           ) : (
             <div className="col gap-16">
-              {cart.items.map((item) => (
-                <div key={item.id} className="card fade-up p-20" style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 16 }}>
-                  <div>
-                    <h3 style={{ margin: 0 }}>{item.tour_name}</h3>
-                    <p className="muted" style={{ marginTop: 6 }}>{item.tour_description || 'No description available.'}</p>
-                    <p className="muted" style={{ marginTop: 6 }}>€{item.price.toFixed(2)}</p>
+              {cart.items.map((item, i) => {
+                const isReservation = item.item_type === 'reservation';
+                const evId = item.reservation_event_id || reservationEvents[item.reservation_id];
+                const ev = isReservation ? eventInfo[evId] : null;
+                const src = isReservation
+                  ? (ev ? eventCover(ev) : null)
+                  : (item.tour_id ? tourCovers[item.tour_id] : null);
+                return (
+                  <div key={item.id} className="card fade-up" style={{
+                    display: 'grid', gridTemplateColumns: '170px 1fr auto',
+                    gap: 0, overflow: 'hidden', animationDelay: `${i * 40}ms`,
+                  }}>
+                    <ItemCover src={src} label={item.tour_name} />
+                    <div className="col gap-8" style={{ minWidth: 0, padding: 16 }}>
+                      <div className="row gap-8 wrap" style={{ alignItems: 'center' }}>
+                        <span className="badge" style={{
+                          background: isReservation ? 'var(--gold)' : 'var(--sage-deep)',
+                          color: '#fff', fontSize: 11,
+                        }}>
+                          {isReservation ? (ev ? categoryLabel(ev) : 'Reservation') : 'Tour'}
+                        </span>
+                        {isReservation && item.seat_number != null && (
+                          <span className="badge" style={{ background: 'var(--paper-deep)', color: 'var(--ink-soft)', fontSize: 11 }}>
+                            Seat #{item.seat_number}
+                          </span>
+                        )}
+                      </div>
+                      <h3 style={{ margin: 0, fontSize: 17 }}>{item.tour_name}</h3>
+                      <p className="muted" style={{
+                        fontSize: 13.5, lineHeight: 1.55, margin: 0,
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                      }}>
+                        {item.tour_description || 'No description available.'}
+                      </p>
+                      {isReservation && ev?.city && (
+                        <span className="faint" style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          <Icon d={ICONS.pin} size={12} /> {ev.city}
+                        </span>
+                      )}
+                    </div>
+                    <div className="col gap-12" style={{ alignItems: 'flex-end', justifyContent: 'space-between', padding: 16, borderLeft: '0.5px dashed var(--sage-line)' }}>
+                      <span style={{ fontWeight: 700, fontSize: 17 }}>€{item.price.toFixed(2)}</span>
+                      <Btn variant="ghost" size="sm" onClick={() => removeMut.mutate(item.id)} disabled={removeMut.isPending}>
+                        Remove
+                      </Btn>
+                    </div>
                   </div>
-                  <div className="col gap-8" style={{ alignItems: 'flex-end' }}>
-                    <Btn variant="ghost" size="sm" onClick={() => removeMut.mutate(item.id)} disabled={removeMut.isPending}>
-                      Remove
-                    </Btn>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -89,6 +168,28 @@ export default function CartPage() {
           <span>€{cart?.total.toFixed(2) ?? '0.00'}</span>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ItemCover({ src, label }) {
+  if (src) {
+    return (
+      <div style={{ height: '100%', minHeight: 140, overflow: 'hidden', flexShrink: 0 }}>
+        <img src={src} alt={label} loading="lazy"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      height: '100%', minHeight: 140, flexShrink: 0,
+      background: 'linear-gradient(135deg, var(--sage-light) 0%, var(--paper-deep) 100%)',
+      display: 'grid', placeItems: 'center',
+    }}>
+      <span style={{ fontFamily: 'var(--serif)', fontSize: 34, color: 'var(--sage-deep)', opacity: 0.4 }}>
+        {label?.[0]?.toUpperCase() || '?'}
+      </span>
     </div>
   );
 }

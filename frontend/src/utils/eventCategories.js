@@ -90,8 +90,13 @@ export function categoryLabel(ev) {
 export function eventCover(ev) {
   if (ev?.image_url) return ev.image_url;
   const meta = getCategoryMeta(ev);
-  return meta?.cover || null;
+  return meta?.cover || DEFAULT_EVENT_COVER;
 }
+
+// Generic fallback so legacy events (or ones without a category cover)
+// still render a photo instead of an initial letter.
+export const DEFAULT_EVENT_COVER =
+  'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=800&q=80&fm=webp';
 
 export function formatEventDate(d) {
   if (!d) return '';

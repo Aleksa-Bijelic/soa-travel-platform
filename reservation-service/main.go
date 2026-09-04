@@ -108,6 +108,7 @@ func main() {
 	activityRepo := &repo.ActivityRepository{DB: database}
 
 	tourClient := grpcclient.NewTourClient(getEnv("TOUR_SERVICE_GRPC_ADDR", ""))
+	purchaseClient := grpcclient.NewPurchaseClient(getEnv("PURCHASE_GRPC_ADDR", "purchase-app:50051"))
 
 	reservationService := &service.ReservationService{
 		EventRepo:       eventRepo,
@@ -115,6 +116,7 @@ func main() {
 		TourSessionRepo: tourSessionRepo,
 		ActivityRepo:    activityRepo,
 		TourClient:      tourClient,
+		PurchaseClient:  purchaseClient,
 		DB:              database,
 	}
 

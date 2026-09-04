@@ -18,15 +18,16 @@ type AddReservationToCartRequest struct {
 }
 
 type CartItemResponse struct {
-	ID              string    `json:"id"`
-	TourID          string    `json:"tour_id,omitempty"`
-	TourName        string    `json:"tour_name"`
-	TourDescription string    `json:"tour_description"`
-	Price           float64   `json:"price"`
-	CreatedAt       time.Time `json:"created_at"`
-	ItemType        string    `json:"item_type"`
-	ReservationID   string    `json:"reservation_id,omitempty"`
-	SeatNumber      *int      `json:"seat_number,omitempty"`
+	ID                 string    `json:"id"`
+	TourID             string    `json:"tour_id,omitempty"`
+	TourName           string    `json:"tour_name"`
+	TourDescription    string    `json:"tour_description"`
+	Price              float64   `json:"price"`
+	CreatedAt          time.Time `json:"created_at"`
+	ItemType           string    `json:"item_type"`
+	ReservationID      string    `json:"reservation_id,omitempty"`
+	ReservationEventID string    `json:"reservation_event_id,omitempty"`
+	SeatNumber         *int      `json:"seat_number,omitempty"`
 }
 
 type CartResponse struct {
