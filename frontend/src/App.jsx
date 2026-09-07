@@ -16,6 +16,11 @@ import SimulatorPage from './pages/SimulatorPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminUsersPage from './pages/AdminUsersPage';
 import ActiveTourPage from './pages/ActiveTourPage';
+import EventsPage from './pages/EventsPage';
+import EventDetailPage from './pages/EventDetailPage';
+import SeatSelectionPage from './pages/SeatSelectionPage';
+import SessionBookingPage from './pages/SessionBookingPage';
+import CreateEventPage from './pages/CreateEventPage';
 
 function RequireAuth({ children }) {
   const { user } = useAuth();
@@ -42,12 +47,18 @@ function Nav() {
               <NavLink to="/browse" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                 Browse
               </NavLink>
+              <NavLink to="/events" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                Events
+              </NavLink>
             </>
           )}
           {user?.role === 'tourist' && (
             <>
               <NavLink to="/browse" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                 Browse tours
+              </NavLink>
+              <NavLink to="/events" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+                Events
               </NavLink>
               <NavLink to="/my-purchases" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
                 My purchases
@@ -117,13 +128,23 @@ export default function App() {
 
         <Route path="browse" element={<BrowseToursPage />} />
         <Route path="browse/:id" element={<PublicTourDetailPage />} />
+        <Route path="events" element={<EventsPage />} />
+        <Route path="events/create" element={
+          user?.role === 'guide' ? <CreateEventPage /> : <Navigate to="/events" replace />
+        } />
+        <Route path="events/:id" element={<EventDetailPage />} />
+        <Route path="events/:id/seats" element={<SeatSelectionPage />} />
+        <Route path="events/:id/book" element={<SessionBookingPage />} />
+        <Route path="my-reservations" element={
+          user?.role === 'tourist' ? <PurchasedToursPage key="reservations" initialTab="reservations" /> : <Navigate to="/events" replace />
+        } />
         <Route path="blogs" element={<BlogsPage />} />
         <Route path="blogs/:id" element={<BlogDetailPage />} />
         <Route path="cart" element={
           user?.role === 'tourist' ? <CartPage /> : <Navigate to="/browse" replace />
         } />
         <Route path="my-purchases" element={
-          user?.role === 'tourist' ? <PurchasedToursPage /> : <Navigate to="/browse" replace />
+          user?.role === 'tourist' ? <PurchasedToursPage key="tours" initialTab="tours" /> : <Navigate to="/browse" replace />
         } />
         <Route path="simulator" element={
           user?.role === 'tourist' ? <SimulatorPage /> : <Navigate to="/browse" replace />

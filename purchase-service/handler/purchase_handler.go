@@ -24,13 +24,46 @@ func (h *PurchaseHandler) GetCart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cart, err := h.Service.GetCart(userID)
+	cart, err := h.Service.GetCart(userID, r.Header.Get("Authorization"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	writeJSON(w, cart)
+}
+
+func (h *PurchaseHandler) AddReservationToCart(w http.ResponseWriter, r *http.Request) {
+	userID, err := getUserID(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	var req dto.AddReservationToCartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	reservationID, err := uuid.Parse(req.ReservationID)
+	if err != nil {
+		http.Error(w, "invalid reservation_id", http.StatusBadRequest)
+		return
+	}
+	eventID, err := uuid.Parse(req.EventID)
+	if err != nil {
+		http.Error(w, "invalid event_id", http.StatusBadRequest)
+		return
+	}
+
+	cartItem, err := h.Service.AddReservationToCart(userID, reservationID, eventID, req.EventName, req.SeatNumber, req.Price)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	writeJSON(w, cartItem)
 }
 
 func (h *PurchaseHandler) AddCartItem(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +103,7 @@ func (h *PurchaseHandler) RemoveCartItem(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.Service.RemoveCartItem(userID, itemID); err != nil {
+	if err := h.Service.RemoveCartItem(userID, itemID, r.Header.Get("Authorization")); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -85,7 +118,7 @@ func (h *PurchaseHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	checkout, err := h.Service.Checkout(userID)
+	checkout, err := h.Service.Checkout(userID, r.Header.Get("Authorization"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

@@ -33,6 +33,15 @@ func (repo *CartRepository) Update(item *model.CartItem) error {
 	}).Error
 }
 
+func (repo *CartRepository) FindByID(userID, id uuid.UUID) (*model.CartItem, error) {
+	var item model.CartItem
+	err := repo.DB.Where("user_id = ? AND id = ?", userID, id).First(&item).Error
+	if err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
 func (repo *CartRepository) DeleteByID(userID, id uuid.UUID) error {
 	return repo.DB.Where("user_id = ? AND id = ?", userID, id).Delete(&model.CartItem{}).Error
 }

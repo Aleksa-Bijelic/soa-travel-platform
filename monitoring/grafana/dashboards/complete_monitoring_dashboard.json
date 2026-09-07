@@ -10,25 +10,47 @@
     {
       "type": "gauge",
       "title": "Host CPU Usage",
-      "gridPos": {"x": 0, "y": 0, "w": 6, "h": 8},
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 - (avg by(instance) (rate(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}[1m])) * 100)",
+          "expr": "100 - (avg(rate(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}[2m])) * 100)",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "red", "value": 80}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         }
       }
     },
     {
       "type": "gauge",
       "title": "Host RAM Usage",
-      "gridPos": {"x": 6, "y": 0, "w": 6, "h": 8},
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
@@ -39,124 +61,233 @@
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "red", "value": 80}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         }
       }
     },
     {
       "type": "timeseries",
       "title": "Host Filesystem Usage",
-      "gridPos": {"x": 0, "y": 8, "w": 12, "h": 8},
+      "description": "Root filesystem only (mountpoint=\"/\", host root remapped from /host/root).",
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "100 * (sum(node_filesystem_size_bytes{job=\"node-exporter\",fstype!~\"tmpfs|overlay|squashfs\"}) - sum(node_filesystem_free_bytes{job=\"node-exporter\",fstype!~\"tmpfs|overlay|squashfs\"})) / sum(node_filesystem_size_bytes{job=\"node-exporter\",fstype!~\"tmpfs|overlay|squashfs\"})",
-          "legendFormat": "host filesystem",
+          "expr": "100 * (1 - (sum(node_filesystem_avail_bytes{job=\"node-exporter\",mountpoint=\"/\",fstype=~\"ext4|xfs|btrfs|overlay|zfs\"}) / sum(node_filesystem_size_bytes{job=\"node-exporter\",mountpoint=\"/\",fstype=~\"ext4|xfs|btrfs|overlay|zfs\"})))",
+          "legendFormat": "root filesystem used",
           "refId": "A"
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "percent"}
+        "defaults": {
+          "unit": "percent"
+        }
       }
     },
     {
       "type": "timeseries",
       "title": "Host Network Traffic",
-      "gridPos": {"x": 12, "y": 8, "w": 12, "h": 8},
+      "description": "Physical interfaces only \u2014 loopback and docker/veth bridges excluded.",
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum by(instance) (rate(node_network_receive_bytes_total{job=\"node-exporter\"}[1m]))",
-          "legendFormat": "receive {{instance}}",
+          "expr": "sum(rate(node_network_receive_bytes_total{job=\"node-exporter\",device!~\"lo|veth.+|docker.+|br-.+|cali.+|flannel.+|cni.+\"}[2m]))",
+          "legendFormat": "receive",
           "refId": "A"
         },
         {
-          "expr": "sum by(instance) (rate(node_network_transmit_bytes_total{job=\"node-exporter\"}[1m]))",
-          "legendFormat": "transmit {{instance}}",
+          "expr": "sum(rate(node_network_transmit_bytes_total{job=\"node-exporter\",device!~\"lo|veth.+|docker.+|br-.+|cali.+|flannel.+|cni.+\"}[2m]))",
+          "legendFormat": "transmit",
           "refId": "B"
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "Bps"}
+        "defaults": {
+          "unit": "Bps"
+        }
       }
     },
     {
       "type": "gauge",
       "title": "Container CPU Usage",
-      "gridPos": {"x": 0, "y": 16, "w": 6, "h": 8},
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 6,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum by(name) (rate(container_cpu_usage_seconds_total{job=\"cadvisor\"}[1m])) / count(node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}) * 100",
+          "expr": "sum by(container_name) (rate(docker_container_cpu_usage_total{job=\"telegraf\",cpu=\"cpu-total\",container_name=~\"$container\"}[2m])) / 1e9 / scalar(count(count by(cpu) (node_cpu_seconds_total{job=\"node-exporter\",mode=\"idle\"}))) * 100",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "red", "value": 80}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
         }
       }
     },
     {
       "type": "gauge",
       "title": "Container RAM Usage",
-      "gridPos": {"x": 6, "y": 16, "w": 6, "h": 8},
+      "gridPos": {
+        "x": 6,
+        "y": 16,
+        "w": 6,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "sum by(name) (container_memory_working_set_bytes{job=\"cadvisor\"})",
+          "expr": "docker_container_mem_usage{job=\"telegraf\",container_name=~\"$container\"}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "bytes",
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": 0}, {"color": "red", "value": 8589934592}]}
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 8589934592
+              }
+            ]
+          }
         }
       }
     },
     {
       "type": "timeseries",
-      "title": "Container Filesystem Usage",
-      "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+      "title": "Container Disk I/O",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
       "datasource": "Prometheus",
       "targets": [
         {
-          "expr": "container_fs_usage_bytes{job=\"cadvisor\"}",
-          "legendFormat": "{{name}}",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {"unit": "bytes"}
-      }
-    },
-    {
-      "type": "timeseries",
-      "title": "Container Network Traffic",
-      "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
-      "datasource": "Prometheus",
-      "targets": [
-        {
-          "expr": "sum by(name) (rate(container_network_receive_bytes_total{job=\"cadvisor\"}[1m]))",
-          "legendFormat": "receive {{name}}",
+          "expr": "sum by(container_name) (rate(docker_container_blkio_io_service_bytes_recursive_read{job=\"telegraf\",container_name=~\"$container\"}[2m]))",
+          "legendFormat": "read {{container_name}}",
           "refId": "A"
         },
         {
-          "expr": "sum by(name) (rate(container_network_transmit_bytes_total{job=\"cadvisor\"}[1m]))",
-          "legendFormat": "transmit {{name}}",
+          "expr": "sum by(container_name) (rate(docker_container_blkio_io_service_bytes_recursive_write{job=\"telegraf\",container_name=~\"$container\"}[2m]))",
+          "legendFormat": "write {{container_name}}",
           "refId": "B"
         }
       ],
       "fieldConfig": {
-        "defaults": {"unit": "Bps"}
+        "defaults": {
+          "unit": "Bps"
+        }
+      },
+      "description": "Per-container disk read/write throughput. (Per-container writable-layer size is not exposed by the Docker API on this host; host root filesystem is on the Host panel.)"
+    },
+    {
+      "type": "timeseries",
+      "title": "Container Network Traffic",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum by(container_name) (rate(docker_container_net_rx_bytes{job=\"telegraf\",container_name=~\"$container\"}[2m]))",
+          "legendFormat": "receive {{container_name}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by(container_name) (rate(docker_container_net_tx_bytes{job=\"telegraf\",container_name=~\"$container\"}[2m]))",
+          "legendFormat": "transmit {{container_name}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        }
       }
     }
   ],
-  "time": {"from": "now-1h", "to": "now"},
+  "templating": {
+    "list": [
+      {
+        "name": "container",
+        "label": "Container",
+        "type": "query",
+        "datasource": "Prometheus",
+        "definition": "label_values(docker_container_mem_usage, container_name)",
+        "query": {
+          "query": "label_values(docker_container_mem_usage, container_name)",
+          "refId": "PrometheusVariableQuery"
+        },
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "refresh": "15s",
-  "templating": {"list": []},
-  "annotations": {"list": []},
-  "version": 1
+  "annotations": {
+    "list": []
+  }
 }

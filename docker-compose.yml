@@ -170,6 +170,7 @@ services:
       NATS_USER: ${NATS_USER:-natscon}
       NATS_PASSWORD: ${NATS_PASSWORD:-admin}
       TOUR_SERVICE_GRPC_ADDR: tour-app:50051
+      RESERVATION_SERVICE_URL: http://reservation-app:8085
     depends_on:
       purchase-db:
         condition: service_healthy
@@ -196,6 +197,56 @@ services:
       - ./init/postgres/purchases:/docker-entrypoint-initdb.d:Z
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${PURCHASE_DB_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging: *fluent-bit
+
+  reservation-app:
+    build:
+      context: .
+      dockerfile: ./reservation-service/Dockerfile
+    container_name: reservation-app
+    restart: on-failure
+    networks:
+      - servers
+    environment:
+      DB_HOST: reservation-db
+      DB_PORT: 5432
+      DB_USER: ${RESERVATION_DB_USER:-postgres}
+      DB_PASSWORD: ${RESERVATION_DB_PASSWORD:-postgres}
+      DB_NAME: ${RESERVATION_DB_NAME:-reservation}
+      DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET}
+      TOUR_SERVICE_GRPC_ADDR: tour-app:50051
+      PURCHASE_GRPC_ADDR: purchase-app:50051
+      NATS_HOST: ${NATS_HOST:-nats}
+      NATS_PORT: ${NATS_PORT:-4222}
+      NATS_USER: ${NATS_USER:-natscon}
+      NATS_PASSWORD: ${NATS_PASSWORD:-admin}
+    depends_on:
+      reservation-db:
+        condition: service_healthy
+      purchase-app:
+        condition: service_started
+    logging: *fluent-bit
+
+  reservation-db:
+    container_name: reservation-db
+    image: postgres:16-alpine
+    restart: always
+    networks:
+      - servers
+    environment:
+      POSTGRES_USER: ${RESERVATION_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${RESERVATION_DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${RESERVATION_DB_NAME:-reservation}
+    ports:
+      - "5437:5432"
+    volumes:
+      - reservation_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RESERVATION_DB_USER:-postgres}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -316,20 +367,54 @@ services:
       - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro,Z
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    # Needs >= v0.52 for Docker's containerd image store support
+    # (older versions fail layerdb lookup -> no per-container metrics).
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
+    privileged: true
+    command:
+      # Talk to Docker's embedded containerd (moby namespace) so the docker
+      # driver can resolve container names with the containerd image store.
+      - '--containerd=/run/containerd/containerd.sock'
+      - '--containerd-namespace=moby'
     networks:
       - servers
     ports:
       - "8081:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /run/docker/containerd/containerd.sock:/run/containerd/containerd.sock:ro
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+  telegraf:
+    # Per-container metrics (CPU/RAM/FS/network) via the Docker Engine API.
+    # Used instead of cAdvisor, whose docker driver cannot see containers on
+    # hosts with Docker's containerd image store.
+    image: telegraf:latest
+    container_name: telegraf
+    # The telegraf entrypoint drops to the unprivileged "telegraf" user, so it
+    # needs the HOST's docker group (GID) to talk to /var/run/docker.sock.
+    group_add:
+      - "460"
+    # SELinux-enforcing hosts (RHEL/Fedora/openSUSE) otherwise block
+    # container access to the Docker socket entirely.
+    security_opt:
+      - label:disable
+    networks:
+      - servers
+    ports:
+      - "9273:9273"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro,z
+      - ./monitoring/telegraf/telegraf.conf:/etc/telegraf/telegraf.conf:ro,Z
 
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node-exporter
+    privileged: true
+    pid: "host"
     networks:
       - servers
     ports:
@@ -338,6 +423,9 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--path.rootfs=/host/root'
+      # Default excludes "overlay" -> on overlay-root Linux hosts the "/" mount
+      # vanishes and Host Filesystem shows no data. Same list minus overlay.
+      - '--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|fusectl|hugetlbfs|iso9660|mqueue|nsfs|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$'
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -393,6 +481,7 @@ volumes:
   purchase_pg_data:
   followers_neo4j_data:
   grafana_data:
+  reservation_pg_data:
 
 networks:
   servers:

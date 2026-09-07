@@ -1,0 +1,124 @@
+{
+  "title": "Reservations Logging",
+  "uid": "reservations_logging",
+  "schemaVersion": 42,
+  "version": 1,
+  "timezone": "browser",
+  "editable": true,
+  "hideControls": false,
+  "panels": [
+    {
+      "type": "logs",
+      "title": "Reserve attempts & outcomes (reservation-app)",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      },
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{container_name=~\".*reservation-app.*\"} |= \"Reserve \"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Denied reservations \u2014 conflicts: who lost the race and why",
+      "description": "Every failed attempt with tourist, event, seat and reason (seat taken = lost the race, event full, purchase gate, expired).",
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{container_name=~\".*reservation-app.*\"} |= \"Reserve denied\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Successful reservations \u2014 who booked what",
+      "description": "One line per booking: reservation id, tourist, event, type (tour_session/activity), seat (- = headcount) and occupancy.",
+      "gridPos": {
+        "x": 12,
+        "y": 10,
+        "w": 12,
+        "h": 10
+      },
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{container_name=~\".*reservation-app.*\"} |= \"Reserved id=\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Expiry cleaner \u2014 5-minute unpaid holds being released",
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{container_name=~\".*reservation-app.*\"} |= \"EXPIRY\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    },
+    {
+      "type": "logs",
+      "title": "Purchase service \u2014 checkout / cart vs reservations",
+      "description": "Confirm/cancel calls toward reservation-service on checkout and cart removal.",
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": "Loki",
+      "targets": [
+        {
+          "expr": "{container_name=~\".*purchase-app.*\"} |= \"PURCHASE\"",
+          "refId": "A"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending"
+      }
+    }
+  ]
+}

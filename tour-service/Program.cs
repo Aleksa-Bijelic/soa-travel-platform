@@ -92,12 +92,9 @@ builder.Services.AddSingleton<IArchiveTourOrchestrator>(sp => sp.GetRequiredServ
 
 var app = builder.Build();
 
-/*
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<TourDbContext>();
-    db.Database.Migrate();
-
     db.Database.ExecuteSqlRaw(@"
         CREATE TABLE IF NOT EXISTS ""Reviews"" (
             ""Id"" uuid NOT NULL,
@@ -142,8 +139,23 @@ using (var scope = app.Services.CreateScope())
            CONSTRAINT ""FK_CompletedKeyPoints_TourExecutions_TourExecutionId"" FOREIGN KEY (""TourExecutionId"") REFERENCES ""TourExecutions"" (""Id"") ON DELETE CASCADE
        );
     ");
+
+    db.Database.ExecuteSqlRaw(@"
+       CREATE TABLE IF NOT EXISTS ""TourSessions"" (
+           ""Id"" uuid NOT NULL,
+           ""TourId"" uuid NOT NULL,
+           ""GuideId"" text NOT NULL,
+           ""SessionDate"" timestamp with time zone NOT NULL,
+           ""MaxCapacity"" integer NOT NULL,
+           ""PricePerPerson"" decimal(10,2) NOT NULL,
+           ""Location"" text NOT NULL,
+           ""Status"" text NOT NULL DEFAULT 'scheduled',
+           ""CreatedAt"" timestamp with time zone NOT NULL DEFAULT now(),
+           CONSTRAINT ""PK_TourSessions"" PRIMARY KEY (""Id""),
+           CONSTRAINT ""FK_TourSessions_Tours_TourId"" FOREIGN KEY (""TourId"") REFERENCES ""Tours"" (""Id"") ON DELETE CASCADE
+       );
+    ");
 }
-*/
 
 app.Services.GetRequiredService<ArchiveTourOrchestrator>().Start();
 
