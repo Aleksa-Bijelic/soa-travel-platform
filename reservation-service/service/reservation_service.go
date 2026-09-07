@@ -137,8 +137,10 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 //    same event serialize here, so capacity can never be oversold and two
 //    tourists can never take the same seat.
 // 3. Check capacity (active reservations vs max_capacity)
-// 4. Check seat availability inside the lock (activities always carry a seat;
-//    tour sessions book per-person rows without seat numbers)
+// 4. Seat handling: guided-tour bookings carry no seat. For activities the
+//    requested seat is taken when free; otherwise the nearest free seat is
+//    assigned (cinema-style fallback) so simultaneous clickers spread around
+//    instead of leaving empty-handed.
 // 5. For tour sessions: the tourist must have purchased the tour first
 // 6. INSERT reservation (seat-level partial unique index is the final guard)
 // 7. UPDATE event status if full
@@ -149,6 +151,9 @@ func (s *ReservationService) CreateEvent(req dto.CreateEventRequest, creatorID s
 // the entire transaction is rolled back.
 func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, req dto.ReserveRequest) (*model.Reservation, error) {
 	var result *model.Reservation
+	var eventType, occupancy, assigned string
+
+	log.Printf("[RESERVATION] Reserve attempt tourist=%s event=%s seat=%s", touristID, eventID, seatStr(req.SeatNumber))
 
 	err := s.DB.Transaction(func(tx *gorm.DB) error {
 		// Step 1: Lock the event row to prevent concurrent modifications
@@ -173,7 +178,11 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 			return errors.New("event is full")
 		}
 
-		// Step 4: For activities, check if specific seat is available
+		// Step 4: Seat handling. Guided-tour bookings carry no seat number.
+		// For activities the requested seat is required; when it is taken
+		// (e.g. lost a same-instant race) the nearest free seat is assigned
+		// instead, so nobody leaves empty-handed while spots remain.
+		assignedSeat := req.SeatNumber
 		if req.SeatNumber != nil {
 			seatNum := *req.SeatNumber
 			if seatNum < 1 || seatNum > event.MaxCapacity {
@@ -184,7 +193,17 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 				return err
 			}
 			if !available {
-				return fmt.Errorf("seat %d is already taken", seatNum)
+				taken, err := s.ReservationRepo.ActiveSeatNumbers(tx, eventID)
+				if err != nil {
+					return err
+				}
+				fallback, ok := bestAvailableSeat(event.MaxCapacity, seatNum, taken)
+				if !ok {
+					return fmt.Errorf("seat %d is already taken and no free seats remain", seatNum)
+				}
+				assignedSeat = &fallback
+				log.Printf("[RESERVATION] Seat fallback tourist=%s event=%s requested=%d assigned=%d",
+					touristID, eventID, seatNum, fallback)
 			}
 		} else if event.EventType == model.EventActivity {
 			return errors.New("seat_number is required for activities")
@@ -214,7 +233,7 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 			ID:         uuid.New(),
 			EventID:    eventID,
 			TouristID:  touristID,
-			SeatNumber: req.SeatNumber,
+			SeatNumber: assignedSeat,
 			Status:     model.ReservationPending,
 			ReservedAt: time.Now(),
 			ExpiresAt:  &expiresAt,
@@ -232,21 +251,37 @@ func (s *ReservationService) ReserveSeat(eventID uuid.UUID, touristID string, re
 		}
 
 		result = reservation
-		log.Printf("[RESERVATION] Created reservation %s for event %s by tourist %s (seat: %v)",
-			reservation.ID, eventID, touristID, req.SeatNumber)
+		eventType = string(event.EventType)
+		occupancy = fmt.Sprintf("%d/%d", newCount, event.MaxCapacity)
+		assigned = seatStr(assignedSeat)
 		return nil
 	})
 
 	if err != nil {
 		if isSeatConflict(err) {
-			if req.SeatNumber != nil {
-				return nil, fmt.Errorf("seat %d is already taken", *req.SeatNumber)
-			}
-			return nil, errors.New("seat is already taken")
+			// Backstop hit (should be rare: the in-lock check + fallback
+			// above normally place everyone). Report as a plain denial.
+			err = errors.New("seat is already taken")
+			log.Printf("[RESERVATION] Reserve denied tourist=%s event=%s seat=%s requested=%s reason=%s",
+				touristID, eventID, seatStr(req.SeatNumber), seatStr(req.SeatNumber), err)
+			return nil, err
 		}
+		log.Printf("[RESERVATION] Reserve denied tourist=%s event=%s seat=%s requested=%s reason=%s",
+			touristID, eventID, seatStr(req.SeatNumber), seatStr(req.SeatNumber), err)
 		return nil, err
 	}
+	log.Printf("[RESERVATION] Reserved id=%s tourist=%s event=%s type=%s seat=%s requested=%s occupancy=%s",
+		result.ID, touristID, eventID, eventType, assigned, seatStr(req.SeatNumber), occupancy)
 	return result, nil
+}
+
+// seatStr renders a seat number for logs ("-" when the booking has no seat,
+// i.e. a guided-tour headcount reservation).
+func seatStr(n *int) string {
+	if n == nil {
+		return "-"
+	}
+	return fmt.Sprintf("%d", *n)
 }
 
 func isSeatConflict(err error) bool {
@@ -284,7 +319,7 @@ func (s *ReservationService) CancelReservation(reservationID uuid.UUID, touristI
 			_ = tx.Model(&model.Event{}).Where("id = ?", event.ID).Update("status", model.EventScheduled).Error
 		}
 
-		log.Printf("[RESERVATION] Cancelled reservation %s by tourist %s", reservationID, touristID)
+		log.Printf("[RESERVATION] Cancelled id=%s tourist=%s event=%s seat=%s", reservationID, touristID, reservation.EventID, seatStr(reservation.SeatNumber))
 		return nil
 	})
 }
@@ -319,7 +354,7 @@ func (s *ReservationService) ConfirmReservation(reservationID uuid.UUID) error {
 		}).Error; err != nil {
 			return err
 		}
-		log.Printf("[RESERVATION] Confirmed reservation %s", reservationID)
+		log.Printf("[RESERVATION] Confirmed id=%s tourist=%s event=%s seat=%s", reservationID, reservation.TouristID, reservation.EventID, seatStr(reservation.SeatNumber))
 		return nil
 	})
 }

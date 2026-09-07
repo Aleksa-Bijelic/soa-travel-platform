@@ -40,15 +40,22 @@ export default function EventsPage() {
     return f;
   }, [meta, city, search]);
 
+  // Backend already filters event_date > NOW(), but drop anything that
+  // slipped through or expired while cached so past events never render.
+  const dropPastEvents = (list) => {
+    const now = Date.now();
+    return (list || []).filter((ev) => new Date(ev.event_date).getTime() > now);
+  };
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['events', categoryKey, city, search],
-    queryFn: () => reservationApi.getEvents(token, filters),
+    queryFn: async () => dropPastEvents(await reservationApi.getEvents(token, filters)),
   });
 
   // City options come from the unfiltered list so the dropdown stays complete.
   const { data: allEvents } = useQuery({
     queryKey: ['events-cities'],
-    queryFn: () => reservationApi.getEvents(token, {}),
+    queryFn: async () => dropPastEvents(await reservationApi.getEvents(token, {})),
     staleTime: 60_000,
   });
 

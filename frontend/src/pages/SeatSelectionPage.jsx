@@ -106,47 +106,46 @@ export default function SeatSelectionPage() {
     if (selected.length !== ticketCount || reserving) return;
     setReserving(true);
     setResult(null);
-    // Re-read the seat map first: the backend is the source of truth and
-    // anything taken meanwhile is reported instead of failing blindly.
-    let freshTaken = taken;
+    // Refresh the map for display; the server decides placement — a seat
+    // taken a split second ago is remapped to the nearest free one instead
+    // of failing.
     try {
-      const fresh = await queryClient.fetchQuery({
+      await queryClient.fetchQuery({
         queryKey: seatsQueryKey,
         queryFn: () => reservationApi.getSeats(id, token),
       });
-      freshTaken = new Set(
-        (fresh || [])
-          .filter((s) => s.status === 'pending' || s.status === 'confirmed')
-          .map((s) => s.seat_number),
-      );
     } catch {
-      // Fall through with the last known state; the server still guards us.
+      // Fall through; the server still guards us.
     }
 
     const ok = [];
     const failed = [];
+    const moved = [];
+    const resolved = new Set();
     for (const seat of selected) {
-      if (freshTaken.has(seat)) {
-        failed.push({ seat, error: 'just taken by someone else' });
-        continue;
-      }
       try {
         const data = await reservationApi.reserveSeat(id, seat, token);
+        const assignedSeat = data.seat_number;
         try {
-          await addToCart(data, seat);
+          await addToCart(data, assignedSeat);
         } catch (cartErr) {
           failed.push({ seat, error: `reserved but cart failed: ${cartErr.message}` });
+          resolved.add(seat);
           continue;
         }
-        ok.push(seat);
+        ok.push(assignedSeat);
+        resolved.add(seat);
+        if (assignedSeat !== seat) {
+          moved.push({ from: seat, to: assignedSeat });
+        }
       } catch (e) {
         failed.push({ seat, error: e.message });
+        resolved.add(seat);
       }
     }
 
-    const failedSeats = new Set(failed.map((f) => f.seat));
-    setSelected((sel) => sel.filter((s) => !ok.includes(s) && !failedSeats.has(s)));
-    setResult({ ok, failed });
+    setSelected((sel) => sel.filter((s) => !resolved.has(s)));
+    setResult({ ok, failed, moved });
     queryClient.invalidateQueries({ queryKey: seatsQueryKey });
     queryClient.invalidateQueries({ queryKey: ['event', id] });
     queryClient.invalidateQueries({ queryKey: ['purchase-cart'] });
@@ -273,6 +272,12 @@ export default function SeatSelectionPage() {
                   <p style={{ margin: 0, fontWeight: 600 }}>
                     Reserved seat{result.ok.length !== 1 ? 's' : ''} {result.ok.join(', ')} — added to your cart.
                   </p>
+                  {result.moved?.length > 0 && (
+                    <p style={{ margin: '6px 0 0', fontSize: 13, opacity: 0.95 }}>
+                      {result.moved.map((m) => `Seat ${m.from} was just taken, you got seat ${m.to} instead`).join('. ')}.
+                      Cancel it and pick another if you prefer.
+                    </p>
+                  )}
                   <p style={{ margin: '4px 0 0', fontSize: 13, opacity: 0.9 }}>
                     Complete checkout within 5 minutes to confirm.
                   </p>
@@ -282,7 +287,7 @@ export default function SeatSelectionPage() {
                 <ErrBanner>
                   Could not reserve seat{result.failed.length !== 1 ? 's' : ''}{' '}
                   {result.failed.map((f) => f.seat).join(', ')}: {result.failed[0].error}.
-                  Someone else may have taken {result.failed.length !== 1 ? 'them' : 'it'} just now — the map above is refreshed.
+                  The map above is refreshed — pick other seats if spots remain.
                 </ErrBanner>
               )}
               {result.ok.length > 0 && (
@@ -303,7 +308,8 @@ export default function SeatSelectionPage() {
                 : `Select ${ticketCount - selected.length} more seat${ticketCount - selected.length !== 1 ? 's' : ''}`}
           </Btn>
           <p className="faint" style={{ fontSize: 12, textAlign: 'center', marginTop: 8, marginBottom: 0 }}>
-            Seats are reserved one by one on the server — if another visitor takes a seat first, you keep the rest and see exactly which one was lost.
+            Seats are reserved one by one on the server — if another visitor is faster on your seat,
+            you automatically get the nearest free one and can swap it later from your reservations.
           </p>
         </div>
       )}

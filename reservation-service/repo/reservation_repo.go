@@ -58,6 +58,23 @@ func (r *ReservationRepository) CheckSeatAvailability(tx *gorm.DB, eventID uuid.
 	return count == 0, nil
 }
 
+// ActiveSeatNumbers returns occupied seat numbers inside the caller's
+// transaction (used by the best-seat fallback while holding the event lock).
+func (r *ReservationRepository) ActiveSeatNumbers(tx *gorm.DB, eventID uuid.UUID) (map[int]bool, error) {
+	var seats []int
+	err := tx.Model(&model.Reservation{}).
+		Where("event_id = ? AND seat_number IS NOT NULL AND status IN ?",
+			eventID, []string{"pending", "confirmed"}).
+		Pluck("seat_number", &seats).Error
+	if err != nil {
+		return nil, err
+	}
+	taken := make(map[int]bool, len(seats))
+	for _, s := range seats {
+		taken[s] = true
+	}
+	return taken, nil
+}
 // CheckDuplicateReservation checks if user already has an active reservation for this event.
 func (r *ReservationRepository) CheckDuplicateReservation(tx *gorm.DB, eventID uuid.UUID, touristID string) (bool, error) {
 	var count int64
